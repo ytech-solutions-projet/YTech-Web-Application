@@ -1,0 +1,265 @@
+.card {
+  background: white;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-full-width {
+  width: 100%;
+}
+
+/* Variants */
+.card-default {
+  background: white;
+  border: 1px solid #e5e7eb;
+}
+
+.card-outlined {
+  background: transparent;
+  border: 1px solid #d1d5db;
+}
+
+.card-elevated {
+  background: white;
+  border: none;
+}
+
+.card-filled {
+  background: #f9fafb;
+  border: 1px solid #f3f4f6;
+}
+
+.card-ghost {
+  background: transparent;
+  border: none;
+}
+
+/* Elevations */
+.card-elevation-none {
+  box-shadow: none;
+}
+
+.card-elevation-small {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.card-elevation-medium {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.card-elevation-large {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.card-elevation-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Padding */
+.card-padding-none {
+  padding: 0;
+}
+
+.card-padding-small {
+  padding: 1rem;
+}
+
+.card-padding-medium {
+  padding: 1.5rem;
+}
+
+.card-padding-large {
+  padding: 2rem;
+}
+
+.card-padding-xl {
+  padding: 2.5rem;
+}
+
+/* Rounded */
+.card-rounded-none {
+  border-radius: 0;
+}
+
+.card-rounded-small {
+  border-radius: 0.25rem;
+}
+
+.card-rounded-medium {
+  border-radius: 0.5rem;
+}
+
+.card-rounded-large {
+  border-radius: 0.75rem;
+}
+
+.card-rounded-xl {
+  border-radius: 1rem;
+}
+
+.card-rounded-full {
+  border-radius: 9999px;
+}
+
+/* Hover effects */
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.card-clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.card-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.card-clickable:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Card sections */
+.card-header {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 1rem;
+}
+
+.card-body {
+  flex: 1;
+}
+
+.card-footer {
+  padding-top: 1rem;
+  border-top: 1px solid #f3f4f6;
+  margin-top: 1rem;
+}
+
+/* Card content styles */
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.5rem 0;
+  line-height: 1.75rem;
+}
+
+.card-subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 1rem 0;
+  line-height: 1.25rem;
+}
+
+.card-text {
+  font-size: 0.875rem;
+  color: #374151;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .card-padding-small {
+    padding: 0.75rem;
+  }
+
+  .card-padding-medium {
+    padding: 1rem;
+  }
+
+  .card-padding-large {
+    padding: 1.5rem;
+  }
+
+  .card-padding-xl {
+    padding: 2rem;
+  }
+
+  .card-title {
+    font-size: 1.125rem;
+  }
+
+  .card-subtitle {
+    font-size: 0.8125rem;
+  }
+
+  .card-text {
+    font-size: 0.8125rem;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .card-default {
+    background: #1f2937;
+    border-color: #374151;
+  }
+
+  .card-outlined {
+    border-color: #4b5563;
+  }
+
+  .card-filled {
+    background: #374151;
+    border-color: #4b5563;
+  }
+
+  .card-header {
+    border-bottom-color: #374151;
+  }
+
+  .card-footer {
+    border-top-color: #374151;
+  }
+
+  .card-title {
+    color: #f3f4f6;
+  }
+
+  .card-subtitle {
+    color: #9ca3af;
+  }
+
+  .card-text {
+    color: #d1d5db;
+  }
+}
+
+/* Animation for card entrance */
+@keyframes cardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-entrance {
+  animation: cardSlideIn 0.3s ease-out;
+}
+
+/* Loading skeleton */
+.card-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

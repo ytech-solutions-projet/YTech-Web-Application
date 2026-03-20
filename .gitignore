@@ -1,0 +1,399 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Production builds
+/frontend/build
+/backend/dist
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env.test
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+!frontend/public/
+!frontend/public/**
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Security logs
+backend/logs/
+backend/compliance/
+backend/security_alerts.log
+backend/comprehensive_security.log
+
+# Security files
+backend/security_*.js
+backend/iso27001_controls.js
+backend/comprehensive_security.js
+backend/security_middleware.js
+backend/security_logging.js
+# backend/server_*.js - REMOVED to allow server_max_security.js
+
+# Reports
+ULTIMATE_SECURITY_REPORT.md
+SECURITY_SUMMARY.md
+ISO27001_IMPLEMENTATION.md
+security_report*.md
+
+# Admin files
+create_admin.js
+
+# Documentation build
+docs/build/
+
+# Test files
+coverage/
+.nyc_output/
+test-results/
+junit.xml
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+
+# Lock files
+package-lock.json
+yarn.lock
+
+# Local configuration
+config/local.json
+config/development.json
+config/production.json
+
+# Database dumps
+*.sql
+*.dump
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Docker
+.dockerignore
+Dockerfile.local
+
+# Kubernetes
+*.yaml.local
+*.yml.local
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# CI/CD
+.github/workflows/local.*
+.gitlab-ci.local.*
+
+# Monitoring
+*.pid
+*.out
+monitoring/
+metrics/
+
+# Profiling
+*.cpuprofile
+*.heapdump
+*.profile
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# Build tools
+webpack-stats.json
+bundle-stats.html
+
+# IDE
+.vscode/settings.json
+.idea/workspace.xml
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store?
+ehthumbs.db
+Icon?
+Thumbs.db
+
+# Local development
+.local/
+.localhistory/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Security scanning
+*.scan
+*.security
+security-reports/
+
+# Performance profiling
+*.prof
+*.perf
+performance/
+
+# Error logs
+error.log
+errors.log
+fatal.log
+panic.log
+
+# Access logs
+access.log
+requests.log
+server.log
+
+# Application logs
+app.log
+application.log
+service.log
+
+# System logs
+system.log
+kernel.log
+daemon.log
+
+# Security logs
+security.log
+auth.log
+audit.log
+
+# Backup and archive files
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# Database files
+*.sqlite
+*.sqlite3
+*.mdb
+
+# Configuration files with secrets
+config.json
+secrets.json
+credentials.json
+private.json
+
+# Development tools
+.eslintrc.local
+.prettierrc.local
+.stylelintrc.local
+
+# Build artifacts
+build/
+dist/
+out/
+target/
+bin/
+
+# Test coverage
+coverage/
+.nyc_output
+lcov.info
+lcov-report/
+
+# Documentation build
+docs/_build/
+docs/.doctrees/
+
+# Local development overrides
+config/local.js
+config/development.local.js
+config/production.local.js
+
+# Monitoring and metrics
+metrics/
+monitoring/
+traces/
+profiles/
+
+# Security scanning tools
+bandit-report/
+safety-report/
+semgrep-report/
+
+# Containerization
+.dockerignore
+docker-compose.override.yml
+
+# Cloud provider files
+.aws/
+.gcp/
+.azure/
+.firebase/
+
+# Package manager locks
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local configuration overrides
+config/local.js
+config/development.local.js
+config/production.local.js
+
+# Temporary and cache files
+tmp/
+temp/
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Build outputs
+build/
+dist/
+out/
+target/
+
+# Test outputs
+coverage/
+.nyc_output
+test-results/
+
+# Monitoring
+metrics/
+logs/
+traces/
+
+# Security
+security-reports/
+*.scan
+*.audit
+
+# Container and deployment
+.dockerignore
+docker-compose.override.yml
+
+# Cloud provider
+.aws/
+.gcp/
+.azure/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
