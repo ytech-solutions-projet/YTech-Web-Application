@@ -63,7 +63,8 @@ const PaymentSuccessPage = () => {
       `Client : ${user?.name || 'N/A'}`,
       `Email : ${user?.email || 'N/A'}`,
       '',
-      `Plan : ${transaction?.planName || 'N/A'}`,
+      `Projet : ${transaction?.service || transaction?.planName || 'N/A'}`,
+      `Reference devis : ${transaction?.quoteId || 'N/A'}`,
       `Montant : ${transaction?.amount || '0'} ${transaction?.currency || 'MAD'}`,
       `Statut : ${transaction?.status || 'completed'}`,
       '',
@@ -106,7 +107,7 @@ const PaymentSuccessPage = () => {
               Votre confirmation reste disponible sur cette page et dans votre espace client.
             </p>
             <ul className="hero-panel__list">
-              <li>Plan : {transaction?.planName || 'N/A'}</li>
+              <li>Projet : {transaction?.service || transaction?.planName || 'N/A'}</li>
               <li>Date : {formatDate(transaction?.timestamp || new Date().toISOString())}</li>
               <li>Montant : {transaction?.amount?.toLocaleString() || '0'} {transaction?.currency || 'MAD'}</li>
             </ul>
@@ -128,9 +129,15 @@ const PaymentSuccessPage = () => {
                 <strong>{user?.email || 'N/A'}</strong>
               </li>
               <li>
-                <span>Plan</span>
-                <strong>{transaction?.planName || 'N/A'}</strong>
+                <span>Projet</span>
+                <strong>{transaction?.service || transaction?.planName || 'N/A'}</strong>
               </li>
+              {transaction?.quoteId ? (
+                <li>
+                  <span>Devis</span>
+                  <strong>{transaction.quoteId}</strong>
+                </li>
+              ) : null}
               <li>
                 <span>Date</span>
                 <strong>{formatDate(transaction?.timestamp || new Date().toISOString())}</strong>

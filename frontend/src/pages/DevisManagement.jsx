@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import '../styles/app-shell.css';
 import { formatDate, getInitials } from '../utils/helpers';
 import { readAuthUser } from '../utils/storage';
@@ -19,12 +19,67 @@ const statusClasses = {
   in_progress: 'is-info'
 };
 
+const getDefaultPaymentAmount = (quote) =>
+  quote?.metadata?.paymentAmount ?? quote?.metadata?.estimatedMin ?? quote?.metadata?.estimatedMax ?? '';
+
+const formatPaymentAmount = (quote) => {
+  const amount = getDefaultPaymentAmount(quote);
+  if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+    return 'Montant a definir';
+  }
+
+  return `${Number(amount).toLocaleString('fr-MA')} ${quote?.metadata?.paymentCurrency || 'MAD'}`;
+};
+
+const getProjectStepCopy = (quote) => {
+  switch (quote?.status) {
+    case 'approved':
+      return 'Validation faite. Le client doit maintenant passer au paiement pour lancer le projet.';
+    case 'in_progress':
+      return 'Paiement confirme. Le projet est en production.';
+    case 'rejected':
+      return 'Demande refusee. Un nouveau cadrage est necessaire.';
+    default:
+      return 'Demande recue. L equipe est encore en train de l analyser.';
+  }
+};
+
 const DevisManagement = () => {
   const [user, setUser] = useState(null);
   const [quotes, setQuotes] = useState([]);
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [decisionNote, setDecisionNote] = useState('');
+  const [paymentAmountDraft, setPaymentAmountDraft] = useState('');
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isAdmin = user?.role === 'admin';
+  const highlightedQuoteId = searchParams.get('quoteId');
+
+  const syncSelectedQuoteInUrl = (quoteId = null) => {
+    const nextParams = new URLSearchParams(searchParams);
+
+    if (quoteId) {
+      nextParams.set('quoteId', quoteId);
+    } else {
+      nextParams.delete('quoteId');
+    }
+
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const openQuoteDetails = (quote) => {
+    setSelectedQuote(quote);
+    syncSelectedQuoteInUrl(quote.id);
+  };
+
+  const closeQuoteDetails = () => {
+    setSelectedQuote(null);
+
+    if (highlightedQuoteId) {
+      syncSelectedQuoteInUrl(null);
+    }
+  };
 
   useEffect(() => {
     let intervalId;
@@ -64,11 +119,50 @@ const DevisManagement = () => {
     };
   }, [navigate]);
 
-  const handleStatusChange = async (quoteId, newStatus) => {
+  useEffect(() => {
+    if (!selectedQuote) {
+      setDecisionNote('');
+      setPaymentAmountDraft('');
+      return;
+    }
+
+    setDecisionNote(selectedQuote.metadata?.decisionNote || '');
+    setPaymentAmountDraft(
+      getDefaultPaymentAmount(selectedQuote) === ''
+        ? ''
+        : `${getDefaultPaymentAmount(selectedQuote)}`
+    );
+  }, [selectedQuote]);
+
+  useEffect(() => {
+    if (!highlightedQuoteId || quotes.length === 0) {
+      return;
+    }
+
+    const targetQuote = quotes.find((quote) => quote.id === highlightedQuoteId);
+
+    if (targetQuote) {
+      setSelectedQuote(targetQuote);
+    }
+  }, [highlightedQuoteId, quotes]);
+
+  const handleStatusChange = async (quote, newStatus, options = {}) => {
     try {
-      const updatedQuote = await updateQuoteStatus(quoteId, newStatus);
-      setQuotes((prev) => prev.map((quote) => (quote.id === quoteId ? updatedQuote : quote)));
-      setSelectedQuote((prev) => (prev?.id === quoteId ? updatedQuote : prev));
+      const payload = {
+        decisionNote: options.decisionNote ?? decisionNote
+      };
+
+      if (newStatus === 'approved') {
+        const nextPaymentAmount = options.paymentAmount ?? paymentAmountDraft ?? getDefaultPaymentAmount(quote);
+        if (nextPaymentAmount !== '' && Number.isFinite(Number(nextPaymentAmount))) {
+          payload.paymentAmount = Number(nextPaymentAmount);
+        }
+        payload.paymentCurrency = 'MAD';
+      }
+
+      const updatedQuote = await updateQuoteStatus(quote.id, newStatus, payload);
+      setQuotes((prev) => prev.map((item) => (item.id === quote.id ? updatedQuote : item)));
+      setSelectedQuote((prev) => (prev?.id === quote.id ? updatedQuote : prev));
     } catch (error) {
       window.alert(error.message || 'Impossible de mettre a jour le devis.');
     }
@@ -120,10 +214,13 @@ const DevisManagement = () => {
           <div className="workspace-hero__content">
             <div className="workspace-hero__copy">
               <span className="workspace-hero__eyebrow">Suivi des devis</span>
-              <h1 className="workspace-hero__title">Gerez vos demandes en un seul endroit</h1>
+              <h1 className="workspace-hero__title">
+                {isAdmin ? 'Gerez les devis en un seul endroit' : 'Suivez vos demandes en un seul endroit'}
+              </h1>
               <p className="workspace-hero__text">
-                Retrouvez ici toutes vos demandes de devis, leur statut, les prochaines etapes et
-                les details de chaque besoin.
+                {isAdmin
+                  ? 'Retrouvez ici tous les devis, leur statut, les prochaines etapes et les details de chaque besoin.'
+                  : 'Retrouvez ici vos demandes de devis, leur statut et les details de chaque besoin.'}
               </p>
             </div>
             <div className="workspace-hero__meta">
@@ -245,16 +342,21 @@ const DevisManagement = () => {
                           </span>
                         </div>
 
-                        <div className="workspace-quote-card__hero-meta">
-                          <span>{quote.metadata?.budget || 'Budget non specifie'}</span>
-                          <span>{quote.metadata?.timeline || 'Delai non specifie'}</span>
-                          <span>{quote.metadata?.estimatedRange || 'Estimation a definir'}</span>
-                        </div>
+                      <div className="workspace-quote-card__hero-meta">
+                        <span>{quote.metadata?.budget || 'Budget non specifie'}</span>
+                        <span>{quote.metadata?.timeline || 'Delai non specifie'}</span>
+                        <span>{quote.metadata?.estimatedRange || 'Estimation a definir'}</span>
+                        {quote.status === 'approved' ? <span>Paiement : {formatPaymentAmount(quote)}</span> : null}
                       </div>
+                    </div>
 
                       <div className="workspace-quote-card__body">
                         <div className="workspace-quote-card__text">
                           {quote.content.length > 180 ? `${quote.content.slice(0, 180)}...` : quote.content}
+                        </div>
+
+                        <div className="workspace-note" style={{ marginTop: '0.75rem' }}>
+                          {getProjectStepCopy(quote)}
                         </div>
 
                         {quote.metadata?.features?.length > 0 && (
@@ -270,35 +372,50 @@ const DevisManagement = () => {
                           </div>
                         )}
 
-                        <div className="workspace-quote-card__footer">
-                          <span className="workspace-note">{formatDate(quote.timestamp)}</span>
-                          <div className="workspace-inline-actions">
-                            <button
-                              type="button"
-                              className="workspace-inline-btn"
-                              onClick={() => setSelectedQuote(quote)}
-                            >
-                              Voir
-                            </button>
-                            {quote.status === 'pending' && (
+                          <div className="workspace-quote-card__footer">
+                            <span className="workspace-note">{formatDate(quote.timestamp)}</span>
+                            <div className="workspace-inline-actions">
                               <button
                                 type="button"
-                                className="workspace-inline-btn is-success"
-                                onClick={() => handleStatusChange(quote.id, 'approved')}
+                              className="workspace-inline-btn"
+                              onClick={() => openQuoteDetails(quote)}
                               >
-                                Approuver
+                                Voir
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              className="workspace-inline-btn is-danger"
-                              onClick={() => handleDeleteQuote(quote.id)}
-                            >
-                              Supprimer
-                            </button>
+                              {isAdmin && quote.status === 'pending' && (
+                                <button
+                                  type="button"
+                                  className="workspace-inline-btn is-success"
+                                  onClick={() =>
+                                    handleStatusChange(quote, 'approved', {
+                                      paymentAmount: getDefaultPaymentAmount(quote),
+                                      decisionNote: ''
+                                    })
+                                  }
+                                >
+                                  Approuver
+                                </button>
+                              )}
+                              {!isAdmin && quote.status === 'approved' && (
+                                <Link
+                                  to={`/payment?quoteId=${encodeURIComponent(quote.id)}`}
+                                  className="workspace-inline-btn is-success"
+                                >
+                                  Payer
+                                </Link>
+                              )}
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  className="workspace-inline-btn is-danger"
+                                  onClick={() => handleDeleteQuote(quote.id)}
+                                >
+                                  Supprimer
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
                     </div>
                   ))}
                 </div>
@@ -309,13 +426,13 @@ const DevisManagement = () => {
       </div>
 
       {selectedQuote && (
-        <div className="workspace-modal-overlay" onClick={() => setSelectedQuote(null)}>
+        <div className="workspace-modal-overlay" onClick={closeQuoteDetails}>
           <div className="workspace-modal" onClick={(event) => event.stopPropagation()}>
             <div className="workspace-modal__header">
               <button
                 type="button"
                 className="workspace-modal__close"
-                onClick={() => setSelectedQuote(null)}
+                onClick={closeQuoteDetails}
               >
                 x
               </button>
@@ -323,7 +440,9 @@ const DevisManagement = () => {
                 {selectedQuote.metadata?.service || 'Service non specifie'}
               </div>
               <div className="workspace-modal__copy">
-                Consultez tous les details de cette demande puis mettez a jour son statut.
+                {isAdmin
+                  ? 'Consultez tous les details de cette demande puis mettez a jour son statut.'
+                  : 'Consultez tous les details de cette demande et son statut actuel.'}
               </div>
             </div>
 
@@ -353,12 +472,27 @@ const DevisManagement = () => {
                   <strong>Statut</strong>
                   <span>{statusLabels[selectedQuote.status] || 'Inconnu'}</span>
                 </div>
+                <div className="workspace-modal__meta">
+                  <strong>Paiement</strong>
+                  <span>
+                    {selectedQuote.status === 'approved' || selectedQuote.status === 'in_progress'
+                      ? formatPaymentAmount(selectedQuote)
+                      : 'Non requis pour le moment'}
+                  </span>
+                </div>
               </div>
 
               <div className="workspace-modal__section">
                 <h3>Description du projet</h3>
                 <div className="workspace-modal__content">{selectedQuote.content}</div>
               </div>
+
+              {selectedQuote.metadata?.decisionNote ? (
+                <div className="workspace-modal__section">
+                  <h3>Decision YTECH</h3>
+                  <div className="workspace-modal__content">{selectedQuote.metadata.decisionNote}</div>
+                </div>
+              ) : null}
 
               {selectedQuote.metadata?.features?.length > 0 && (
                 <div className="workspace-modal__section">
@@ -373,15 +507,43 @@ const DevisManagement = () => {
                 </div>
               )}
 
+              {isAdmin && selectedQuote.status === 'pending' && (
+                <div className="workspace-modal__section">
+                  <h3>Validation admin</h3>
+                  <div className="workspace-modal__grid">
+                    <div className="workspace-modal__meta">
+                      <strong>Montant a payer</strong>
+                      <input
+                        className="workspace-input"
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={paymentAmountDraft}
+                        onChange={(event) => setPaymentAmountDraft(event.target.value)}
+                        placeholder={`${getDefaultPaymentAmount(selectedQuote) || ''}`}
+                      />
+                    </div>
+                  </div>
+                  <textarea
+                    className="workspace-input"
+                    rows="4"
+                    value={decisionNote}
+                    onChange={(event) => setDecisionNote(event.target.value)}
+                    placeholder="Ajoutez une note pour le client avant l envoi automatique du message."
+                    style={{ marginTop: '1rem', resize: 'vertical' }}
+                  />
+                </div>
+              )}
+
               <div className="workspace-modal__footer">
-                {selectedQuote.status === 'pending' && (
+                {isAdmin && selectedQuote.status === 'pending' && (
                   <>
                     <button
                       type="button"
                       className="workspace-inline-btn is-success"
                       onClick={() => {
-                        handleStatusChange(selectedQuote.id, 'approved');
-                        setSelectedQuote(null);
+                        handleStatusChange(selectedQuote, 'approved');
+                        closeQuoteDetails();
                       }}
                     >
                       Approuver
@@ -390,8 +552,8 @@ const DevisManagement = () => {
                       type="button"
                       className="workspace-inline-btn is-danger"
                       onClick={() => {
-                        handleStatusChange(selectedQuote.id, 'rejected');
-                        setSelectedQuote(null);
+                        handleStatusChange(selectedQuote, 'rejected');
+                        closeQuoteDetails();
                       }}
                     >
                       Rejeter
@@ -399,23 +561,19 @@ const DevisManagement = () => {
                   </>
                 )}
 
-                {selectedQuote.status === 'approved' && (
-                  <button
-                    type="button"
-                    className="workspace-inline-btn is-info"
-                    onClick={() => {
-                      handleStatusChange(selectedQuote.id, 'in_progress');
-                      setSelectedQuote(null);
-                    }}
+                {!isAdmin && selectedQuote.status === 'approved' && (
+                  <Link
+                    to={`/payment?quoteId=${encodeURIComponent(selectedQuote.id)}`}
+                    className="workspace-inline-btn is-success"
                   >
-                    Demarrer le projet
-                  </button>
+                    Payer maintenant
+                  </Link>
                 )}
 
                 <button
                   type="button"
                   className="workspace-inline-btn"
-                  onClick={() => setSelectedQuote(null)}
+                  onClick={closeQuoteDetails}
                 >
                   Fermer
                 </button>

@@ -15,15 +15,26 @@ const initialFormData = {
   timeline: ''
 };
 
-const serviceOptions = [
+const supportServiceOptions = [
   'J ai besoin d etre oriente',
-  'J ai besoin d aide pour cadrer le devis',
+  'Question generale',
+  'Support technique',
   'Site vitrine',
   'Site e-commerce',
   'Application web',
   'Application mobile',
   'SEO et marketing',
   'Maintenance et support'
+];
+
+const quoteHelpServiceOptions = [
+  'Site vitrine',
+  'Site e-commerce',
+  'Application web',
+  'Application mobile',
+  'SEO et marketing',
+  'Maintenance et support',
+  'Je ne sais pas encore quel format choisir'
 ];
 
 const budgetOptions = [
@@ -38,24 +49,6 @@ const timelineOptions = [
   '2 a 4 semaines',
   '1 a 2 mois',
   '2 mois et plus'
-];
-
-const contactCards = [
-  {
-    eyebrow: 'Email',
-    title: 'contact@ytech.ma',
-    text: 'Reponse generale sous 24h avec premiere orientation.'
-  },
-  {
-    eyebrow: 'Telephone',
-    title: '+212 6 00 00 00 00',
-    text: 'Disponible en semaine pour les besoins urgents.'
-  },
-  {
-    eyebrow: 'Casablanca',
-    title: 'Rendez-vous a distance ou sur place',
-    text: 'On adapte le format d echange a votre contexte.'
-  }
 ];
 
 const contactModes = {
@@ -182,6 +175,8 @@ const Contact = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const contactMode = contactModes[contactModeKey];
+  const selectedServiceOptions =
+    contactModeKey === 'quoteHelp' ? quoteHelpServiceOptions : supportServiceOptions;
 
   useEffect(() => {
     setFormData(readPrefilledForm());
@@ -191,8 +186,25 @@ const Contact = () => {
     setContactModeKey(resolveContactModeKey(searchParams.get('intent')));
   }, [searchParams]);
 
+  useEffect(() => {
+    if (contactModeKey !== 'quoteHelp') {
+      setFormData((prev) => ({
+        ...prev,
+        budget: '',
+        timeline: ''
+      }));
+    }
+  }, [contactModeKey]);
+
   const handleModeChange = (nextModeKey) => {
     setContactModeKey(nextModeKey);
+    if (nextModeKey !== 'quoteHelp') {
+      setFormData((prev) => ({
+        ...prev,
+        budget: '',
+        timeline: ''
+      }));
+    }
     setSearchParams(
       nextModeKey === 'support' ? { intent: 'support' } : { intent: contactModes.quoteHelp.queryValue }
     );
@@ -319,13 +331,24 @@ const Contact = () => {
         highlights={['Reponse rapide', 'Cadrage initial', 'Discussion sans friction']}
         aside={
           <>
-            <span className="hero-panel__eyebrow">{contactMode.asideEyebrow}</span>
-            <h2 className="hero-panel__title">{contactMode.asideTitle}</h2>
-            <p className="hero-panel__text">{contactMode.asideText}</p>
+            <span className="hero-panel__eyebrow">Contact direct</span>
+            <h2 className="hero-panel__title">Un formulaire plus simple et plus utile.</h2>
+            <p className="hero-panel__text">
+              Choisissez juste le bon type de demande puis laissez-nous le contexte essentiel.
+            </p>
+            <div className="hero-panel__meta">
+              <div className="hero-panel__metric">
+                <strong>24h</strong>
+                <span>Retour moyen</span>
+              </div>
+              <div className="hero-panel__metric">
+                <strong>2 modes</strong>
+                <span>Aide generale ou aide devis</span>
+              </div>
+            </div>
             <ul className="hero-panel__list">
-              {contactMode.asideList.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
+              <li>contact@ytech.ma</li>
+              <li>+212 6 00 00 00 00</li>
             </ul>
           </>
         }
@@ -333,58 +356,30 @@ const Contact = () => {
 
       <section className="marketing-section marketing-section--compact">
         <div className="container">
-          <div className="card-grid card-grid--three">
-            {contactCards.map((card) => (
-              <article key={card.eyebrow} className="panel-card">
-                <span className="panel-card__eyebrow">{card.eyebrow}</span>
-                <h3 className="panel-card__title">{card.title}</h3>
-                <p className="panel-card__text">{card.text}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="marketing-section">
-        <div className="container">
-          <div className="section-heading section-heading--center">
-            <span className="section-heading__eyebrow">Type de demande</span>
-            <h2 className="section-heading__title">Choisissez le bon format avant d envoyer.</h2>
-            <p className="section-heading__text">
-              Le contact general et l aide sur devis n ont pas le meme objectif. Ce choix nous
-              aide a vous repondre plus clairement.
-            </p>
-          </div>
-
-          <div className="filter-bar" style={{ justifyContent: 'center', marginBottom: '2rem' }}>
-            {Object.entries(contactModes).map(([modeKey, mode]) => (
-              <button
-                key={modeKey}
-                type="button"
-                className={`filter-chip ${contactModeKey === modeKey ? 'is-active' : ''}`}
-                onClick={() => handleModeChange(modeKey)}
-                aria-pressed={contactModeKey === modeKey}
-              >
-                {mode.tabLabel}
-              </button>
-            ))}
-          </div>
-
-          <div className="marketing-form-shell">
-            <aside className="marketing-side-card">
-              <span className="hero-panel__eyebrow">Avant validation</span>
-              <h2 className="hero-panel__title">{contactMode.sideCardTitle}</h2>
-              <p className="hero-panel__text">{contactMode.sideCardText}</p>
-              <ul className="stack-list">
-                {contactMode.sideCardList.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </aside>
+          <div className="marketing-shell-narrow">
+            <div className="filter-bar" style={{ justifyContent: 'center', marginBottom: '1.5rem' }}>
+              {Object.entries(contactModes).map(([modeKey, mode]) => (
+                <button
+                  key={modeKey}
+                  type="button"
+                  className={`filter-chip ${contactModeKey === modeKey ? 'is-active' : ''}`}
+                  onClick={() => handleModeChange(modeKey)}
+                  aria-pressed={contactModeKey === modeKey}
+                >
+                  {mode.tabLabel}
+                </button>
+              ))}
+            </div>
 
             <div className="marketing-form-card">
+              <span className="marketing-pill">{contactMode.tabLabel}</span>
               <h2 className="marketing-form-card__title">{contactMode.formTitle}</h2>
               <p className="marketing-form-card__text">{contactMode.formText}</p>
+              <p className="marketing-note" style={{ marginTop: '-0.6rem', marginBottom: '1.5rem' }}>
+                {contactModeKey === 'quoteHelp'
+                  ? 'Le budget et le delai restent visibles ici pour mieux cadrer le devis.'
+                  : "Pour une demande d'aide generale, on va a l essentiel sans champs inutiles."}
+              </p>
 
               {submitError ? <div className="marketing-alert">{submitError}</div> : null}
 
@@ -459,7 +454,7 @@ const Contact = () => {
                       className={`marketing-select ${errors.service ? 'is-error' : ''}`}
                     >
                       <option value="">{contactMode.servicePlaceholder}</option>
-                      {serviceOptions.map((service) => (
+                      {selectedServiceOptions.map((service) => (
                         <option key={service} value={service}>
                           {service}
                         </option>
@@ -467,43 +462,47 @@ const Contact = () => {
                     </select>
                     {errors.service ? <div className="marketing-field__error">{errors.service}</div> : null}
                   </div>
+                </div>
 
-                  <div className="marketing-field">
-                    <label htmlFor="budget">Budget estime</label>
-                    <select
-                      id="budget"
-                      name="budget"
-                      value={formData.budget}
-                      onChange={handleChange}
-                      className="marketing-select"
-                    >
-                      <option value="">Selectionnez un budget</option>
-                      {budgetOptions.map((budget) => (
-                        <option key={budget} value={budget}>
-                          {budget}
-                        </option>
-                      ))}
-                    </select>
+                {contactModeKey === 'quoteHelp' ? (
+                  <div className="marketing-form__grid">
+                    <div className="marketing-field">
+                      <label htmlFor="budget">Budget estime</label>
+                      <select
+                        id="budget"
+                        name="budget"
+                        value={formData.budget}
+                        onChange={handleChange}
+                        className="marketing-select"
+                      >
+                        <option value="">Selectionnez un budget</option>
+                        {budgetOptions.map((budget) => (
+                          <option key={budget} value={budget}>
+                            {budget}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="marketing-field">
+                      <label htmlFor="timeline">Delai souhaite</label>
+                      <select
+                        id="timeline"
+                        name="timeline"
+                        value={formData.timeline}
+                        onChange={handleChange}
+                        className="marketing-select"
+                      >
+                        <option value="">Selectionnez un delai</option>
+                        {timelineOptions.map((timeline) => (
+                          <option key={timeline} value={timeline}>
+                            {timeline}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                </div>
-
-                <div className="marketing-field">
-                  <label htmlFor="timeline">Delai souhaite</label>
-                  <select
-                    id="timeline"
-                    name="timeline"
-                    value={formData.timeline}
-                    onChange={handleChange}
-                    className="marketing-select"
-                  >
-                    <option value="">Selectionnez un delai</option>
-                    {timelineOptions.map((timeline) => (
-                      <option key={timeline} value={timeline}>
-                        {timeline}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                ) : null}
 
                 <div className="marketing-field">
                   <label htmlFor="projectDescription">{contactMode.descriptionLabel}</label>

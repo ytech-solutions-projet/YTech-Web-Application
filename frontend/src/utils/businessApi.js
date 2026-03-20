@@ -44,12 +44,24 @@ export const submitQuoteRequest = async (quote) => {
   return payload.quote || null;
 };
 
-export const updateQuoteStatus = async (quoteId, status) => {
+export const updateQuoteStatus = async (quoteId, status, options = {}) => {
   const payload = await requestJson(
     `/api/quotes/${encodeURIComponent(quoteId)}/status`,
-    buildJsonOptions('PATCH', { status })
+    buildJsonOptions('PATCH', { status, ...options })
   );
   return payload.quote || null;
+};
+
+export const payQuote = async (quoteId) => {
+  const payload = await requestJson(
+    `/api/quotes/${encodeURIComponent(quoteId)}/pay`,
+    buildJsonOptions('POST')
+  );
+
+  return {
+    quote: payload.quote || null,
+    transaction: payload.transaction || null
+  };
 };
 
 export const deleteQuote = async (quoteId) => {

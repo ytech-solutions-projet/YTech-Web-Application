@@ -72,6 +72,8 @@ const Header = ({ theme = 'light', onToggleTheme = () => {} }) => {
   const privateLinks = isLoggedIn
     ? [
         { to: '/dashboard', label: 'Dashboard' },
+        { to: '/devis-management', label: 'Mes devis' },
+        { to: '/payment', label: 'Paiement' },
         { to: '/messages', label: 'Messages' },
         ...(user?.role === 'admin' ? [{ to: '/admin-messages', label: 'Admin' }] : [])
       ]

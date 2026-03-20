@@ -18,9 +18,20 @@ const sanitizeFeatureList = (features) => {
     .slice(0, 30);
 };
 
+const normalizeFiniteNumber = (value) => {
+  if (!Number.isFinite(Number(value))) {
+    return null;
+  }
+
+  return Number(value);
+};
+
+const normalizeTimestampValue = (value) =>
+  normalizeText(value, { maxLength: 80 }) || null;
+
 const sanitizeQuoteMetadata = (payload = {}) => {
-  const features = sanitizeFeatureList(payload.features);
   const metadata = payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {};
+  const features = sanitizeFeatureList(payload.features || metadata.features);
 
   return {
     service: normalizeText(metadata.service || payload.serviceName || payload.service, { maxLength: 120 }),
@@ -34,21 +45,28 @@ const sanitizeQuoteMetadata = (payload = {}) => {
       metadata.estimatedRange || payload.estimatedRange,
       { maxLength: 120 }
     ),
-    estimatedMin: Number.isFinite(Number(metadata.estimatedMin ?? payload.estimatedMin))
-      ? Number(metadata.estimatedMin ?? payload.estimatedMin)
-      : null,
-    estimatedMax: Number.isFinite(Number(metadata.estimatedMax ?? payload.estimatedMax))
-      ? Number(metadata.estimatedMax ?? payload.estimatedMax)
-      : null,
-    featureCost: Number.isFinite(Number(metadata.featureCost ?? payload.featureCost))
-      ? Number(metadata.featureCost ?? payload.featureCost)
-      : 0,
-    timelineMultiplier: Number.isFinite(Number(metadata.timelineMultiplier ?? payload.timelineMultiplier))
-      ? Number(metadata.timelineMultiplier ?? payload.timelineMultiplier)
-      : 1,
+    estimatedMin: normalizeFiniteNumber(metadata.estimatedMin ?? payload.estimatedMin),
+    estimatedMax: normalizeFiniteNumber(metadata.estimatedMax ?? payload.estimatedMax),
+    featureCost: normalizeFiniteNumber(metadata.featureCost ?? payload.featureCost) ?? 0,
+    timelineMultiplier: normalizeFiniteNumber(metadata.timelineMultiplier ?? payload.timelineMultiplier) ?? 1,
     timelineImpact: normalizeText(
       metadata.timelineImpact || payload.timelineImpact,
       { maxLength: 255 }
+    ),
+    decisionNote: normalizeText(
+      metadata.decisionNote || payload.decisionNote,
+      { maxLength: 1200, multiline: true }
+    ),
+    decidedAt: normalizeTimestampValue(metadata.decidedAt || payload.decidedAt),
+    decidedBy: normalizeText(metadata.decidedBy || payload.decidedBy, { maxLength: 255 }),
+    paymentStatus: normalizeText(metadata.paymentStatus || payload.paymentStatus, { maxLength: 40 }),
+    paymentAmount: normalizeFiniteNumber(metadata.paymentAmount ?? payload.paymentAmount),
+    paymentCurrency:
+      normalizeText(metadata.paymentCurrency || payload.paymentCurrency, { maxLength: 12 }) || 'MAD',
+    paymentPaidAt: normalizeTimestampValue(metadata.paymentPaidAt || payload.paymentPaidAt),
+    paymentTransactionId: normalizeText(
+      metadata.paymentTransactionId || payload.paymentTransactionId,
+      { maxLength: 120 }
     )
   };
 };
@@ -68,7 +86,15 @@ const toApiQuote = (row = {}) => {
     estimatedMax: metadata.estimatedMax ?? null,
     featureCost: metadata.featureCost ?? 0,
     timelineMultiplier: metadata.timelineMultiplier ?? 1,
-    timelineImpact: metadata.timelineImpact || ''
+    timelineImpact: metadata.timelineImpact || '',
+    decisionNote: metadata.decisionNote || '',
+    decidedAt: metadata.decidedAt || '',
+    decidedBy: metadata.decidedBy || '',
+    paymentStatus: metadata.paymentStatus || '',
+    paymentAmount: metadata.paymentAmount ?? null,
+    paymentCurrency: metadata.paymentCurrency || 'MAD',
+    paymentPaidAt: metadata.paymentPaidAt || '',
+    paymentTransactionId: metadata.paymentTransactionId || ''
   };
 
   return {
@@ -96,6 +122,59 @@ class Quote {
 
   static serialize(row) {
     return toApiQuote(row);
+  }
+
+  static resolveDefaultPaymentAmount(metadata = {}) {
+    if (Number.isFinite(Number(metadata.paymentAmount)) && Number(metadata.paymentAmount) > 0) {
+      return Number(metadata.paymentAmount);
+    }
+
+    if (Number.isFinite(Number(metadata.estimatedMin)) && Number(metadata.estimatedMin) > 0) {
+      return Number(metadata.estimatedMin);
+    }
+
+    if (Number.isFinite(Number(metadata.estimatedMax)) && Number(metadata.estimatedMax) > 0) {
+      return Number(metadata.estimatedMax);
+    }
+
+    return null;
+  }
+
+  static buildMetadata(row, nextStatus, options = {}) {
+    const currentMetadata = row?.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+    const mergedMetadata = sanitizeQuoteMetadata({
+      metadata: {
+        ...currentMetadata,
+        ...options
+      },
+      features: options.features || currentMetadata.features
+    });
+
+    let paymentStatus = mergedMetadata.paymentStatus || currentMetadata.paymentStatus || '';
+
+    if (nextStatus === 'approved' && paymentStatus !== 'paid') {
+      paymentStatus = 'awaiting_payment';
+    } else if (nextStatus === 'rejected') {
+      paymentStatus = 'not_required';
+    } else if (nextStatus === 'in_progress') {
+      paymentStatus = options.paymentStatus || paymentStatus || 'paid';
+    }
+
+    const paymentAmount =
+      mergedMetadata.paymentAmount ?? this.resolveDefaultPaymentAmount({ ...currentMetadata, ...mergedMetadata });
+
+    return {
+      ...mergedMetadata,
+      decisionNote: mergedMetadata.decisionNote || currentMetadata.decisionNote || '',
+      decidedAt: mergedMetadata.decidedAt || currentMetadata.decidedAt || '',
+      decidedBy: mergedMetadata.decidedBy || currentMetadata.decidedBy || '',
+      paymentStatus,
+      paymentAmount,
+      paymentCurrency: mergedMetadata.paymentCurrency || currentMetadata.paymentCurrency || 'MAD',
+      paymentPaidAt: mergedMetadata.paymentPaidAt || currentMetadata.paymentPaidAt || '',
+      paymentTransactionId:
+        mergedMetadata.paymentTransactionId || currentMetadata.paymentTransactionId || ''
+    };
   }
 
   static async findRowById(id) {
@@ -213,18 +292,49 @@ class Quote {
     return rows[0] || null;
   }
 
-  static async updateStatus(id, status) {
+  static async updateStatus(id, status, options = {}) {
     const normalizedStatus = normalizeText(status, { maxLength: 30 }).toLowerCase();
     if (!this.allowedStatuses.has(normalizedStatus)) {
       throw new Error('Statut de devis invalide');
     }
 
+    const existingRow = await this.findRowById(id);
+    if (!existingRow) {
+      return null;
+    }
+
+    const metadata = this.buildMetadata(existingRow, normalizedStatus, options);
     const rows = await database.query(
       `UPDATE quotes
-       SET status = $1, updated_at = NOW()
-       WHERE id = $2
+       SET status = $1, metadata = $2::jsonb, updated_at = NOW()
+       WHERE id = $3
        RETURNING *`,
-      [normalizedStatus, id]
+      [normalizedStatus, JSON.stringify(metadata), id]
+    );
+
+    return rows[0] ? this.serialize(rows[0]) : null;
+  }
+
+  static async registerPayment(id, options = {}) {
+    const existingRow = await this.findRowById(id);
+    if (!existingRow) {
+      return null;
+    }
+
+    const paymentTimestamp = new Date().toISOString();
+    const metadata = this.buildMetadata(existingRow, 'in_progress', {
+      ...options,
+      paymentStatus: 'paid',
+      paymentPaidAt: paymentTimestamp,
+      decidedAt: existingRow.metadata?.decidedAt || paymentTimestamp
+    });
+
+    const rows = await database.query(
+      `UPDATE quotes
+       SET status = $1, metadata = $2::jsonb, updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      ['in_progress', JSON.stringify(metadata), id]
     );
 
     return rows[0] ? this.serialize(rows[0]) : null;
