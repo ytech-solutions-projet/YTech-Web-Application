@@ -840,6 +840,12 @@ button {
   gap: 1rem;
 }
 
+.marketing-phone-group {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.95fr) minmax(0, 1.45fr);
+  gap: 0.75rem;
+}
+
 .marketing-field label {
   display: block;
   margin-bottom: 0.48rem;
@@ -874,6 +880,11 @@ button {
 .marketing-input.is-error,
 .marketing-select.is-error,
 .marketing-textarea.is-error {
+  border-color: #dc2626;
+}
+
+.marketing-phone-group.has-error .marketing-phone-group__country,
+.marketing-phone-group.has-error .marketing-phone-group__input {
   border-color: #dc2626;
 }
 
@@ -1233,6 +1244,10 @@ button {
 
   .container {
     width: calc(100% - 24px);
+  }
+
+  .marketing-phone-group {
+    grid-template-columns: 1fr;
   }
 
   .marketing-hero__grid {

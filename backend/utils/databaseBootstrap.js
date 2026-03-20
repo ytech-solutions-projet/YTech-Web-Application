@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs/promises');
 const path = require('path');
 const database = require('../config/database');
+const { normalizePhone } = require('./phone');
 
 const ADMIN_DEFAULTS = {
   name: 'YTECH Admin',
@@ -9,24 +10,6 @@ const ADMIN_DEFAULTS = {
   password: null,
   phone: '+212600000000',
   company: 'YTECH'
-};
-
-const normalizePhone = (phone) => {
-  if (!phone) {
-    return null;
-  }
-
-  const compactPhone = `${phone}`.replace(/\s+/g, '');
-
-  if (/^\+212\d{9}$/.test(compactPhone)) {
-    return compactPhone;
-  }
-
-  if (/^0\d{9}$/.test(compactPhone)) {
-    return `+212${compactPhone.slice(1)}`;
-  }
-
-  return compactPhone;
 };
 
 const getTableColumns = async (tableName) => {

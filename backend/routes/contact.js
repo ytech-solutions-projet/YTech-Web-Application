@@ -11,6 +11,7 @@ const {
   normalizeText,
   parseInteger
 } = require('../utils/security');
+const { isValidPhone, normalizePhone } = require('../utils/phone');
 
 const router = express.Router();
 
@@ -29,7 +30,7 @@ const normalizeContactPayload = (payload = {}) => ({
   id: normalizeText(payload.id, { maxLength: 64 }) || null,
   name: normalizeText(payload.name, { maxLength: 120 }),
   email: normalizeEmail(payload.email),
-  phone: normalizeText(payload.phone, { maxLength: 30 }),
+  phone: normalizePhone(payload.phone),
   company: normalizeText(payload.company, { maxLength: 255 }) || null,
   service: normalizeText(payload.service, { maxLength: 120 }),
   budget: normalizeText(payload.budget, { maxLength: 120 }),
@@ -52,8 +53,8 @@ const validateContactPayload = (payload) => {
     return 'Email invalide';
   }
 
-  if (!payload.phone || payload.phone.length < 8) {
-    return 'Le telephone est requis';
+  if (!payload.phone || !isValidPhone(payload.phone)) {
+    return 'Choisissez un pays puis saisissez un numero de telephone valide';
   }
 
   if (!payload.service) {

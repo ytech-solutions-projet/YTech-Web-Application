@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import PhoneField from '../components/PhoneField';
 import PublicHero from '../components/PublicHero';
 import SiteFooter from '../components/SiteFooter';
+import { isPhoneValueValid } from '../utils/phone';
 import { submitQuoteRequest } from '../utils/businessApi';
 
 const initialFormData = {
@@ -284,7 +286,6 @@ const Devis = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    const trimmedPhone = formData.phone.replace(/\s/g, '');
 
     if (!formData.name.trim()) {
       newErrors.name = 'Le nom est requis';
@@ -298,8 +299,8 @@ const Devis = () => {
 
     if (!formData.phone.trim()) {
       newErrors.phone = 'Le telephone est requis';
-    } else if (!/^\+212[0-9]{9}$/.test(trimmedPhone)) {
-      newErrors.phone = 'Le telephone doit commencer par +212 suivi de 9 chiffres';
+    } else if (!isPhoneValueValid(formData.phone)) {
+      newErrors.phone = 'Choisissez un pays puis saisissez un numero valide';
     }
 
     if (!formData.service) {
@@ -561,19 +562,13 @@ const Devis = () => {
                 </div>
 
                 <div className="marketing-form__grid">
-                  <div className="marketing-field">
-                    <label htmlFor="phone">Telephone *</label>
-                    <input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className={`marketing-input ${errors.phone ? 'is-error' : ''}`}
-                      placeholder="+212 6 00 00 00 00"
-                    />
-                    {errors.phone ? <div className="marketing-field__error">{errors.phone}</div> : null}
-                  </div>
+                  <PhoneField
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    error={errors.phone}
+                  />
 
                   <div className="marketing-field">
                     <label htmlFor="company">Entreprise</label>

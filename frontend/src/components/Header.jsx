@@ -70,13 +70,18 @@ const Header = ({ theme = 'light', onToggleTheme = () => {} }) => {
   const location = useLocation();
 
   const privateLinks = isLoggedIn
-    ? [
-        { to: '/dashboard', label: 'Dashboard' },
-        { to: '/devis-management', label: 'Mes devis' },
-        { to: '/payment', label: 'Paiement' },
-        { to: '/messages', label: 'Messages' },
-        ...(user?.role === 'admin' ? [{ to: '/admin-messages', label: 'Admin' }] : [])
-      ]
+    ? user?.role === 'admin'
+      ? [
+          { to: '/dashboard', label: 'Espace admin' },
+          { to: '/devis-management', label: 'Gestion devis' },
+          { to: '/admin-messages', label: 'Conversations' }
+        ]
+      : [
+          { to: '/dashboard', label: 'Dashboard' },
+          { to: '/devis-management', label: 'Mes devis' },
+          { to: '/payment', label: 'Paiement' },
+          { to: '/messages', label: 'Messages' }
+        ]
     : [];
 
   useEffect(() => {

@@ -16,9 +16,13 @@ const buildJsonOptions = (method, body, options = {}) => {
 const requestJson = async (url, options = {}) => {
   const response = await fetch(url, options);
   const payload = await response.json().catch(() => null);
+  const backendError =
+    payload?.error === 'Route non trouvee'
+      ? "Le service n'est pas encore disponible sur ce serveur. Verifiez le deploiement du backend."
+      : payload?.error || payload?.message;
 
   if (!response.ok || payload?.success === false) {
-    throw new Error(payload?.error || payload?.message || 'Erreur de communication avec le serveur');
+    throw new Error(backendError || 'Erreur de communication avec le serveur');
   }
 
   return payload || {};

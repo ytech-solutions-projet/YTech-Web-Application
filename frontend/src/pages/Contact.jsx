@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import PhoneField from '../components/PhoneField';
 import PublicHero from '../components/PublicHero';
 import SiteFooter from '../components/SiteFooter';
+import { isPhoneValueValid } from '../utils/phone';
 import { submitContactRequest } from '../utils/businessApi';
 
 const initialFormData = {
@@ -241,6 +243,8 @@ const Contact = () => {
 
     if (!formData.phone.trim()) {
       newErrors.phone = 'Le telephone est requis';
+    } else if (!isPhoneValueValid(formData.phone)) {
+      newErrors.phone = 'Choisissez un pays puis saisissez un numero valide';
     }
 
     if (!formData.service) {
@@ -415,19 +419,13 @@ const Contact = () => {
                 </div>
 
                 <div className="marketing-form__grid">
-                  <div className="marketing-field">
-                    <label htmlFor="phone">Telephone *</label>
-                    <input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className={`marketing-input ${errors.phone ? 'is-error' : ''}`}
-                      placeholder="+212 6 00 00 00 00"
-                    />
-                    {errors.phone ? <div className="marketing-field__error">{errors.phone}</div> : null}
-                  </div>
+                  <PhoneField
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    error={errors.phone}
+                  />
 
                   <div className="marketing-field">
                     <label htmlFor="company">Entreprise</label>

@@ -6,6 +6,7 @@ const Quote = require('../models/Quote');
 const User = require('../models/User');
 const { authenticateRequest, maybeAuthenticateRequest, requireAdmin } = require('../middleware/auth');
 const { normalizeEmail, normalizeText, parseInteger } = require('../utils/security');
+const { isValidPhone, normalizePhone } = require('../utils/phone');
 
 const router = express.Router();
 
@@ -35,7 +36,7 @@ const normalizeQuotePayload = (payload = {}) => {
     id: normalizeText(payload.id, { maxLength: 64 }) || null,
     name: normalizeText(payload.name || payload.senderName, { maxLength: 120 }),
     email: normalizeEmail(payload.email || payload.senderEmail || payload.senderId),
-    phone: normalizeText(payload.phone || payload.senderPhone, { maxLength: 30 }),
+    phone: normalizePhone(payload.phone || payload.senderPhone),
     company: normalizeText(payload.company, { maxLength: 255 }) || null,
     serviceId: normalizeText(payload.service || metadata.serviceId, { maxLength: 80 }),
     serviceName: normalizeText(metadata.service || payload.serviceName, { maxLength: 120 }),
@@ -75,8 +76,8 @@ const validateQuotePayload = (payload) => {
     return 'Email invalide';
   }
 
-  if (!payload.phone || !/^\+212\d{9}$/.test(payload.phone.replace(/\s+/g, ''))) {
-    return 'Le telephone doit commencer par +212 suivi de 9 chiffres';
+  if (!payload.phone || !isValidPhone(payload.phone)) {
+    return 'Choisissez un pays puis saisissez un numero de telephone valide';
   }
 
   if (!payload.serviceId) {

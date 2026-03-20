@@ -10,7 +10,7 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { authenticateRequest } = require('../middleware/auth');
-const { normalizePhone } = require('../utils/databaseBootstrap');
+const { isValidPhone, normalizePhone } = require('../utils/phone');
 const { getAuthToken } = require('../utils/request');
 const {
   getAuthCookieName,
@@ -129,10 +129,10 @@ const validateRegistrationData = (req, res, next) => {
     });
   }
 
-  if (phone && !/^\+212\d{9}$/.test(phone)) {
+  if (phone && !isValidPhone(phone)) {
     return res.status(400).json({
       success: false,
-      error: 'Le numero de telephone doit etre au format +212 suivi de 9 chiffres'
+      error: 'Le numero de telephone est invalide. Choisissez un pays puis saisissez un numero valide.'
     });
   }
 
