@@ -13,17 +13,22 @@ const { authenticateRequest } = require('../middleware/auth');
 const { isValidPhone, normalizePhone } = require('../utils/phone');
 const { getAuthToken } = require('../utils/request');
 const {
+  createSignedCsrfToken,
   getAuthCookieName,
   getCookieOptions,
+  getCsrfCookieName,
+  getCsrfCookieOptions,
   isValidEmail,
   normalizeEmail,
   normalizeText,
+  parseBoolean,
   parseInteger,
   validateStrongPassword
 } = require('../utils/security');
 
 const router = express.Router();
 const authCookieName = getAuthCookieName();
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('YTECH_dummy_password_2026!', 12);
 
 const createLimiter = (maxRequests, message) =>
   rateLimit({
@@ -55,7 +60,7 @@ const passwordResetLimiter = createLimiter(
 
 class AuthController {
   static getJwtSecret() {
-    return process.env.JWT_SECRET || 'fallback-secret';
+    return process.env.JWT_SECRET || process.env.SESSION_SECRET || '';
   }
 
   static generateToken(user, sessionToken) {
@@ -96,11 +101,18 @@ class AuthController {
     const token = this.generateToken(user, sessionToken);
 
     res.cookie(authCookieName, token, getCookieOptions());
+    res.cookie(getCsrfCookieName(), createSignedCsrfToken(), getCsrfCookieOptions());
     return res.status(statusCode).json({
       success: true,
       message,
       user
     });
+  }
+
+  static getPasswordResetBaseUrl() {
+    return normalizeText(process.env.PASSWORD_RESET_BASE_URL || process.env.FRONTEND_URL, {
+      maxLength: 2048
+    }) || 'http://localhost:3000';
   }
 }
 
@@ -183,6 +195,13 @@ router.post('/register', registerLimiter, validateRegistrationData, async (req, 
   }
 });
 
+router.get('/csrf-token', (req, res) => {
+  return res.json({
+    success: true,
+    csrfToken: req.csrfToken || null
+  });
+});
+
 router.post('/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = AuthController.sanitizeLoginPayload(req.body);
@@ -194,11 +213,22 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    const user = await User.findByEmail(email, true);
+    const user = await User.findByEmail(email, true, {
+      includeSecurityState: true
+    });
+    const passwordMatch = await bcrypt.compare(password, user?.password || DUMMY_PASSWORD_HASH);
+
     if (!user || !user.password) {
       return res.status(401).json({
         success: false,
         error: 'Email ou mot de passe incorrect'
+      });
+    }
+
+    if (User.isLoginLocked(user)) {
+      return res.status(429).json({
+        success: false,
+        error: 'Connexion temporairement bloquee. Reessayez plus tard.'
       });
     }
 
@@ -209,11 +239,14 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
-      return res.status(401).json({
+      const failedLoginState = await User.recordFailedLogin(user.id);
+
+      return res.status(User.isLoginLocked(failedLoginState) ? 429 : 401).json({
         success: false,
-        error: 'Email ou mot de passe incorrect'
+        error: User.isLoginLocked(failedLoginState)
+          ? 'Connexion temporairement bloquee. Reessayez plus tard.'
+          : 'Email ou mot de passe incorrect'
       });
     }
 
@@ -221,8 +254,8 @@ router.post('/login', authLimiter, async (req, res) => {
     await User.createSession(user.id, sessionToken, req.ip, req.get('User-Agent'));
     await User.markLoginSuccess(user.id);
 
-    delete user.password;
-    return AuthController.sendAuthSuccess(res, user, sessionToken, 'Connexion reussie');
+    const authenticatedUser = await User.findById(user.id);
+    return AuthController.sendAuthSuccess(res, authenticatedUser, sessionToken, 'Connexion reussie');
   } catch (error) {
     console.error('Erreur connexion:', error);
     return res.status(500).json({
@@ -252,6 +285,7 @@ router.post('/logout', async (req, res) => {
     const cookieOptions = getCookieOptions();
     delete cookieOptions.maxAge;
     res.clearCookie(authCookieName, cookieOptions);
+    res.cookie(getCsrfCookieName(), createSignedCsrfToken(), getCsrfCookieOptions());
 
     return res.json({
       success: true,
@@ -292,18 +326,19 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
       });
     }
 
-    const resetToken = jwt.sign(
-      {
-        userId: user.id,
-        type: 'password-reset',
-        timestamp: Date.now()
-      },
-      AuthController.getJwtSecret(),
-      { expiresIn: '15m' }
-    );
+    const resetToken = crypto.randomBytes(48).toString('hex');
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await User.storePasswordResetToken(user.id, resetToken, {
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      expiresAt
+    });
 
-    console.log(`Lien de reinitialisation pour ${email}:`);
-    console.log(`http://localhost:3000/reset-password?token=${resetToken}`);
+    if (parseBoolean(process.env.LOG_PASSWORD_RESET_URLS, process.env.NODE_ENV !== 'production')) {
+      const resetUrl = `${AuthController.getPasswordResetBaseUrl()}/reset-password?token=${encodeURIComponent(resetToken)}`;
+      console.log(`Lien de reinitialisation pour ${email}:`);
+      console.log(resetUrl);
+    }
 
     return res.json({
       success: true,
@@ -339,29 +374,24 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
       });
     }
 
-    try {
-      const decoded = jwt.verify(token, AuthController.getJwtSecret());
+    const resetRequest = await User.findValidPasswordResetToken(token);
 
-      if (decoded.type !== 'password-reset' || !decoded.userId) {
-        return res.status(400).json({
-          success: false,
-          error: 'Token invalide'
-        });
-      }
-
-      await User.updatePassword(decoded.userId, newPassword);
-      await User.invalidateAllSessions(decoded.userId);
-
-      return res.json({
-        success: true,
-        message: 'Mot de passe reinitialise avec succes'
-      });
-    } catch (tokenError) {
+    if (!resetRequest?.user_id) {
       return res.status(400).json({
         success: false,
         error: 'Token expire ou invalide'
       });
     }
+
+    await User.updatePassword(resetRequest.user_id, newPassword);
+    await User.markPasswordResetTokenUsed(token);
+    await User.invalidatePasswordResetTokens(resetRequest.user_id);
+    await User.invalidateAllSessions(resetRequest.user_id);
+
+    return res.json({
+      success: true,
+      message: 'Mot de passe reinitialise avec succes'
+    });
   } catch (error) {
     console.error('Erreur reset password:', error);
     return res.status(500).json({

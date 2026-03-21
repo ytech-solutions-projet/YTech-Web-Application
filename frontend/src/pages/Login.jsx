@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import PublicHero from '../components/PublicHero';
 import SiteFooter from '../components/SiteFooter';
+import { fetchJson } from '../utils/http';
 import { writeAuthSession } from '../utils/storage';
 import '../styles/auth.css';
 
@@ -85,23 +86,16 @@ const Login = () => {
     setSubmitError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const { payload } = await fetchJson('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        credentials: 'include',
         body: JSON.stringify({
           email: formData.email.trim().toLowerCase(),
           password: formData.password
         })
       });
-
-      const payload = await response.json();
-
-      if (!response.ok || !payload.success) {
-        throw new Error(payload.error || 'Email ou mot de passe incorrect');
-      }
 
       if (!writeAuthSession(payload)) {
         throw new Error('Impossible de sauvegarder votre session localement');

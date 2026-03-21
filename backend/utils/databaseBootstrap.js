@@ -46,6 +46,10 @@ const createUsersTable = async () => {
       role VARCHAR(30) NOT NULL DEFAULT 'client',
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+      failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until TIMESTAMPTZ,
+      last_failed_login TIMESTAMPTZ,
+      password_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -61,8 +65,49 @@ const createSessionsTable = async (userIdType = 'INTEGER') => {
       ip_address VARCHAR(64),
       user_agent TEXT,
       expires_at TIMESTAMPTZ NOT NULL,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      last_accessed TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+
+  await database.execute(`
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_user_expires_at
+    ON user_sessions(user_id, expires_at DESC)
+  `);
+};
+
+const createUserSecurityStateTable = async (userIdType = 'INTEGER') => {
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS user_security_state (
+      user_id ${userIdType} PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until TIMESTAMPTZ,
+      last_failed_login TIMESTAMPTZ,
+      password_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+};
+
+const createPasswordResetTokensTable = async (userIdType = 'INTEGER') => {
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id SERIAL PRIMARY KEY,
+      user_id ${userIdType} NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash VARCHAR(255) NOT NULL UNIQUE,
+      request_ip VARCHAR(64),
+      user_agent TEXT,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await database.execute(`
+    CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_expires_at
+    ON password_reset_tokens(user_id, expires_at DESC)
   `);
 };
 
@@ -249,6 +294,16 @@ const ensureSchema = async () => {
   const sessionColumns = await getTableColumns('user_sessions');
   if (sessionColumns.size === 0) {
     await createSessionsTable(userIdType);
+  }
+
+  const userSecurityStateColumns = await getTableColumns('user_security_state');
+  if (userSecurityStateColumns.size === 0) {
+    await createUserSecurityStateTable(userIdType);
+  }
+
+  const passwordResetColumns = await getTableColumns('password_reset_tokens');
+  if (passwordResetColumns.size === 0) {
+    await createPasswordResetTokensTable(userIdType);
   }
 
   const contactColumns = await getTableColumns('contact_requests');

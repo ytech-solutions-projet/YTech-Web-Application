@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import PhoneField from '../components/PhoneField';
 import PublicHero from '../components/PublicHero';
 import SiteFooter from '../components/SiteFooter';
+import { fetchJson } from '../utils/http';
 import { isPhoneValueValid } from '../utils/phone';
 import { writeAuthSession } from '../utils/storage';
 import '../styles/auth.css';
@@ -222,12 +223,11 @@ const Register = () => {
     setSubmitError('');
 
     try {
-      const response = await fetch('/api/auth/register', {
+      const { payload } = await fetchJson('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        credentials: 'include',
         body: JSON.stringify({
           name: formData.name.trim(),
           email: formData.email.trim().toLowerCase(),
@@ -237,12 +237,6 @@ const Register = () => {
           acceptedTermsAt: new Date().toISOString()
         })
       });
-
-      const payload = await response.json();
-
-      if (!response.ok || !payload.success) {
-        throw new Error(payload.error || "Une erreur est survenue lors de l'inscription");
-      }
 
       if (!writeAuthSession(payload)) {
         throw new Error('Impossible de sauvegarder votre session localement');

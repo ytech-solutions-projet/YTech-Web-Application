@@ -17,6 +17,7 @@ const userRoutes = require('./routes/user');
 const contactRoutes = require('./routes/contact');
 const quoteRoutes = require('./routes/quotes');
 const messageRoutes = require('./routes/messages');
+const { csrfProtection } = require('./middleware/security');
 const { initializeDatabase } = require('./utils/databaseBootstrap');
 const { createRequestLog } = require('./utils/request');
 const {
@@ -30,10 +31,36 @@ const PORT = parseInteger(process.env.PORT, 5001);
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_PRODUCTION = NODE_ENV === 'production';
 const ALLOWED_ORIGINS = getAllowedOrigins();
+const CSP_CONNECT_SOURCES = ["'self'"];
+const CSP_DIRECTIVES = {
+  defaultSrc: ["'self'"],
+  styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+  styleSrcAttr: ["'unsafe-inline'"],
+  fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+  imgSrc: ["'self'", 'data:', 'https:'],
+  scriptSrc: ["'self'"],
+  scriptSrcAttr: ["'none'"],
+  connectSrc: [],
+  objectSrc: ["'none'"],
+  frameAncestors: ["'none'"],
+  baseUri: ["'self'"],
+  formAction: ["'self'"]
+};
+
+if (!IS_PRODUCTION) {
+  CSP_CONNECT_SOURCES.push(...ALLOWED_ORIGINS, 'ws://localhost:3000', 'ws://127.0.0.1:3000');
+}
+
+CSP_DIRECTIVES.connectSrc = [...new Set(CSP_CONNECT_SOURCES)];
+
+if (IS_PRODUCTION) {
+  CSP_DIRECTIVES.upgradeInsecureRequests = [];
+}
 
 const app = express();
 
 app.disable('x-powered-by');
+app.set('etag', 'strong');
 
 if (parseBoolean(process.env.TRUST_PROXY, IS_PRODUCTION)) {
   app.set('trust proxy', 1);
@@ -42,17 +69,22 @@ if (parseBoolean(process.env.TRUST_PROXY, IS_PRODUCTION)) {
 app.use(
   helmet({
     contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        scriptSrc: ["'self'"],
-        connectSrc: ["'self'", ...ALLOWED_ORIGINS, 'ws:', 'wss:'],
-        objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-        baseUri: ["'self'"],
-        formAction: ["'self'"]
+      directives: CSP_DIRECTIVES
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: {
+      policy: 'same-origin'
+    },
+    crossOriginResourcePolicy: {
+      policy: 'same-site'
+    },
+    permissionsPolicy: {
+      features: {
+        camera: [],
+        geolocation: [],
+        microphone: [],
+        payment: [],
+        usb: []
       }
     },
     referrerPolicy: {
@@ -79,13 +111,13 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Requested-With'],
     optionsSuccessStatus: 204
   })
 );
 
 app.use(morgan(IS_PRODUCTION ? 'combined' : 'dev'));
-app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '100kb' }));
+app.use(express.json({ strict: true, limit: process.env.JSON_BODY_LIMIT || '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: process.env.URLENCODED_BODY_LIMIT || '50kb' }));
 
 const apiLimiter = rateLimit({
@@ -101,6 +133,7 @@ const apiLimiter = rateLimit({
 });
 
 app.use('/api', apiLimiter);
+app.use('/api', csrfProtection);
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {

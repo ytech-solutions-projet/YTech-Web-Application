@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { getAuthToken } = require('../utils/request');
 
-const getJwtSecret = () => process.env.JWT_SECRET || 'fallback-secret';
+const getJwtSecret = () => process.env.JWT_SECRET || process.env.SESSION_SECRET || '';
 
 const resolveAuthenticatedRequest = async (req) => {
   const token = getAuthToken(req);
@@ -16,8 +16,17 @@ const resolveAuthenticatedRequest = async (req) => {
     return null;
   }
 
-  const user = await User.findById(decoded.id);
+  const user = await User.findById(decoded.id, {
+    includeSecurityState: true
+  });
   if (!user || !user.is_active) {
+    return null;
+  }
+
+  const passwordChangedAt = user.password_changed_at ? new Date(user.password_changed_at).getTime() : 0;
+  const tokenIssuedAt = Number.isFinite(decoded.iat) ? decoded.iat * 1000 : 0;
+
+  if (passwordChangedAt && tokenIssuedAt && tokenIssuedAt < passwordChangedAt) {
     return null;
   }
 
@@ -28,12 +37,20 @@ const resolveAuthenticatedRequest = async (req) => {
 
   await User.touchSession(decoded.id, decoded.sid);
 
+  const {
+    failed_login_attempts,
+    locked_until,
+    last_failed_login,
+    password_changed_at,
+    ...safeUser
+  } = user;
+
   return {
     token,
     session,
     user: {
       ...decoded,
-      details: user
+      details: safeUser
     }
   };
 };

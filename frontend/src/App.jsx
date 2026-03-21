@@ -17,6 +17,7 @@ import DevisManagement from './pages/DevisManagement';
 import Messages from './pages/Messages';
 import AdminMessages from './pages/AdminMessages';
 import Chatbot from './components/Chatbot';
+import { ensureCsrfToken, fetchJson } from './utils/http';
 import {
   AUTH_CHANGE_EVENT,
   clearAuthSession,
@@ -82,26 +83,17 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    ensureCsrfToken().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
 
     const syncServerSession = async () => {
-      const localUser = readAuthUser();
-
-      if (!localUser) {
-        if (isMounted) {
-          setAuthUser(null);
-          setAuthReady(true);
-        }
-        return;
-      }
-
       try {
-        const response = await fetch('/api/auth/verify', {
-          credentials: 'include'
-        });
-        const payload = await response.json();
+        const { payload } = await fetchJson('/api/auth/verify');
 
-        if (!response.ok || !payload.success || !payload.user) {
+        if (!payload.user) {
           clearAuthSession();
           if (isMounted) {
             setAuthUser(null);

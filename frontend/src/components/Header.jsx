@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { fetchJson } from '../utils/http';
 import { AUTH_CHANGE_EVENT, clearAuthSession } from '../utils/storage';
 import './Header.css';
 
@@ -171,9 +172,8 @@ const Header = ({ theme = 'light', onToggleTheme = () => {} }) => {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
+      await fetchJson('/api/auth/logout', {
+        method: 'POST'
       });
     } catch (error) {
       console.warn("Impossible de notifier la deconnexion cote serveur.", error);

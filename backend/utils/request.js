@@ -5,6 +5,8 @@ const SENSITIVE_KEYS = new Set([
   'newPassword',
   'token',
   'sessionToken',
+  'csrfToken',
+  'x-csrf-token',
   'authorization',
   'cookie'
 ]);
@@ -62,7 +64,14 @@ const parseCookies = (cookieHeader = '') => {
       }
 
       const name = part.slice(0, separatorIndex).trim();
-      const value = decodeURIComponent(part.slice(separatorIndex + 1).trim());
+      const rawValue = part.slice(separatorIndex + 1).trim();
+      let value = rawValue;
+
+      try {
+        value = decodeURIComponent(rawValue);
+      } catch (error) {
+        value = rawValue;
+      }
 
       if (name) {
         cookies[name] = value;

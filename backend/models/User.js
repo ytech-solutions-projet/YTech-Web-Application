@@ -6,7 +6,16 @@
 const bcrypt = require('bcryptjs');
 const database = require('../config/database');
 const { getTableColumns } = require('../utils/databaseBootstrap');
-const { getSessionDurationMs } = require('../utils/security');
+const {
+  createScopedHash,
+  createSessionTokenHash,
+  getLoginLockDurationMinutes,
+  getMaxActiveSessions,
+  getMaxFailedLoginAttempts,
+  getSessionDurationMs,
+  normalizeText,
+  normalizeUserAgent
+} = require('../utils/security');
 
 const BCRYPT_ROUNDS = Number.parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 
@@ -26,7 +35,64 @@ class User {
     return columns.has(columnName);
   }
 
-  static async getSelectableUserFields(includePassword = false) {
+  static async hasInlineSecurityColumns() {
+    return (
+      (await this.hasColumn('users', 'failed_login_attempts')) &&
+      (await this.hasColumn('users', 'locked_until')) &&
+      (await this.hasColumn('users', 'password_changed_at'))
+    );
+  }
+
+  static buildSecurityState(securityState = {}, fallbackRow = {}) {
+    return {
+      failed_login_attempts: Number(securityState.failed_login_attempts ?? fallbackRow.failed_login_attempts ?? 0),
+      locked_until: securityState.locked_until ?? fallbackRow.locked_until ?? null,
+      last_failed_login: securityState.last_failed_login ?? fallbackRow.last_failed_login ?? null,
+      password_changed_at:
+        securityState.password_changed_at ?? fallbackRow.password_changed_at ?? fallbackRow.created_at ?? null
+    };
+  }
+
+  static async ensureSecurityState(userId) {
+    const rows = await database.query(
+      `INSERT INTO user_security_state (
+        user_id,
+        password_changed_at
+      )
+      VALUES (
+        $1,
+        COALESCE((SELECT created_at FROM users WHERE id = $1), NOW())
+      )
+      ON CONFLICT (user_id) DO UPDATE
+      SET user_id = EXCLUDED.user_id
+      RETURNING failed_login_attempts, locked_until, last_failed_login, password_changed_at`,
+      [userId]
+    );
+
+    return this.buildSecurityState(rows[0]);
+  }
+
+  static async attachSecurityState(user) {
+    if (!user) {
+      return null;
+    }
+
+    if (await this.hasInlineSecurityColumns()) {
+      return {
+        ...user,
+        ...this.buildSecurityState({}, user)
+      };
+    }
+
+    const securityState = await this.ensureSecurityState(user.id);
+    return {
+      ...user,
+      ...securityState
+    };
+  }
+
+  static async getSelectableUserFields(includePassword = false, options = {}) {
+    const { includeSecurityState = false } = options;
     const fields = ['id', 'name', 'email'];
 
     if (includePassword) {
@@ -45,6 +111,24 @@ class User {
 
     if (await this.hasColumn('users', 'last_login')) {
       fields.push('last_login');
+    }
+
+    if (includeSecurityState) {
+      if (await this.hasColumn('users', 'failed_login_attempts')) {
+        fields.push('failed_login_attempts');
+      }
+
+      if (await this.hasColumn('users', 'locked_until')) {
+        fields.push('locked_until');
+      }
+
+      if (await this.hasColumn('users', 'last_failed_login')) {
+        fields.push('last_failed_login');
+      }
+
+      if (await this.hasColumn('users', 'password_changed_at')) {
+        fields.push('password_changed_at');
+      }
     }
 
     return fields;
@@ -76,27 +160,39 @@ class User {
       values
     );
 
+    if (!(await this.hasInlineSecurityColumns())) {
+      await this.ensureSecurityState(result[0].id);
+    }
+
     return this.findById(result[0].id);
   }
 
-  static async findById(id) {
-    const fields = await this.getSelectableUserFields();
+  static async findById(id, options = {}) {
+    const fields = await this.getSelectableUserFields(false, options);
     const users = await database.query(
       `SELECT ${fields.join(', ')} FROM users WHERE id = $1`,
       [id]
     );
 
-    return users[0] || null;
+    if (!users[0]) {
+      return null;
+    }
+
+    return options.includeSecurityState ? this.attachSecurityState(users[0]) : users[0];
   }
 
-  static async findByEmail(email, includePassword = false) {
-    const fields = await this.getSelectableUserFields(includePassword);
+  static async findByEmail(email, includePassword = false, options = {}) {
+    const fields = await this.getSelectableUserFields(includePassword, options);
     const users = await database.query(
       `SELECT ${fields.join(', ')} FROM users WHERE email = $1`,
       [email.toLowerCase()]
     );
 
-    return users[0] || null;
+    if (!users[0]) {
+      return null;
+    }
+
+    return options.includeSecurityState ? this.attachSecurityState(users[0]) : users[0];
   }
 
   static async emailExists(email) {
@@ -154,9 +250,26 @@ class User {
   static async updatePassword(id, newPassword) {
     const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     const updates = ['password = $1', 'email_verified = $2'];
+    const hasInlineSecurityColumns = await this.hasInlineSecurityColumns();
 
     if (await this.hasColumn('users', 'updated_at')) {
       updates.push('updated_at = NOW()');
+    }
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'password_changed_at'))) {
+      updates.push('password_changed_at = NOW()');
+    }
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'failed_login_attempts'))) {
+      updates.push('failed_login_attempts = 0');
+    }
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'locked_until'))) {
+      updates.push('locked_until = NULL');
+    }
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'last_failed_login'))) {
+      updates.push('last_failed_login = NULL');
     }
 
     const result = await database.execute(
@@ -164,30 +277,143 @@ class User {
       [hashedPassword, true, id]
     );
 
+    if (!hasInlineSecurityColumns) {
+      await this.ensureSecurityState(id);
+      await database.execute(
+        `UPDATE user_security_state
+         SET failed_login_attempts = 0,
+             locked_until = NULL,
+             last_failed_login = NULL,
+             password_changed_at = NOW(),
+             updated_at = NOW()
+         WHERE user_id = $1`,
+        [id]
+      );
+    }
+
     return result.rowCount > 0;
   }
 
   static async markLoginSuccess(id) {
     const updates = [];
+    const hasInlineSecurityColumns = await this.hasInlineSecurityColumns();
 
     if (await this.hasColumn('users', 'last_login')) {
       updates.push('last_login = NOW()');
+    }
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'failed_login_attempts'))) {
+      updates.push('failed_login_attempts = 0');
+    }
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'locked_until'))) {
+      updates.push('locked_until = NULL');
+    }
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'last_failed_login'))) {
+      updates.push('last_failed_login = NULL');
     }
 
     if (await this.hasColumn('users', 'updated_at')) {
       updates.push('updated_at = NOW()');
     }
 
-    if (updates.length === 0) {
-      return false;
+    let updatedUser = false;
+
+    if (updates.length > 0) {
+      const result = await database.execute(
+        `UPDATE users SET ${updates.join(', ')} WHERE id = $1`,
+        [id]
+      );
+
+      updatedUser = result.rowCount > 0;
     }
 
-    const result = await database.execute(
-      `UPDATE users SET ${updates.join(', ')} WHERE id = $1`,
-      [id]
+    if (!hasInlineSecurityColumns) {
+      await this.ensureSecurityState(id);
+      const securityResult = await database.execute(
+        `UPDATE user_security_state
+         SET failed_login_attempts = 0,
+             locked_until = NULL,
+             last_failed_login = NULL,
+             updated_at = NOW()
+         WHERE user_id = $1`,
+        [id]
+      );
+
+      return updatedUser || securityResult.rowCount > 0;
+    }
+
+    return updatedUser;
+  }
+
+  static async recordFailedLogin(id) {
+    const nextAttemptLimit = getMaxFailedLoginAttempts();
+    const lockDurationMinutes = getLoginLockDurationMinutes();
+    const hasInlineSecurityColumns = await this.hasInlineSecurityColumns();
+    const updates = [];
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'failed_login_attempts'))) {
+      updates.push('failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1');
+    }
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'last_failed_login'))) {
+      updates.push('last_failed_login = NOW()');
+    }
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'locked_until'))) {
+      updates.push(`
+        locked_until = CASE
+          WHEN COALESCE(failed_login_attempts, 0) + 1 >= $2
+            THEN NOW() + ($3::text || ' minutes')::interval
+          ELSE locked_until
+        END
+      `);
+    }
+
+    if (hasInlineSecurityColumns && (await this.hasColumn('users', 'updated_at'))) {
+      updates.push('updated_at = NOW()');
+    }
+
+    if (!hasInlineSecurityColumns) {
+      await this.ensureSecurityState(id);
+
+      const rows = await database.query(
+        `UPDATE user_security_state
+         SET failed_login_attempts = failed_login_attempts + 1,
+             last_failed_login = NOW(),
+             locked_until = CASE
+               WHEN failed_login_attempts + 1 >= $2
+                 THEN NOW() + ($3::text || ' minutes')::interval
+               ELSE locked_until
+             END,
+             updated_at = NOW()
+         WHERE user_id = $1
+         RETURNING failed_login_attempts, locked_until, last_failed_login, password_changed_at`,
+        [id, nextAttemptLimit, lockDurationMinutes]
+      );
+
+      return rows[0] || null;
+    }
+
+    if (updates.length === 0) {
+      return null;
+    }
+
+    const rows = await database.query(
+      `UPDATE users
+       SET ${updates.join(', ')}
+       WHERE id = $1
+       RETURNING failed_login_attempts, locked_until`,
+      [id, nextAttemptLimit, lockDurationMinutes]
     );
 
-    return result.rowCount > 0;
+    return rows[0] || null;
+  }
+
+  static isLoginLocked(user) {
+    const lockedUntil = user?.locked_until ? new Date(user.locked_until) : null;
+    return Boolean(lockedUntil) && Number.isFinite(lockedUntil.getTime()) && lockedUntil.getTime() > Date.now();
   }
 
   static async findAll(options = {}) {
@@ -226,17 +452,18 @@ class User {
 
   static async createSession(userId, sessionToken, ipAddress = null, userAgent = null) {
     const expiresAt = new Date(Date.now() + getSessionDurationMs());
+    const hashedSessionToken = createSessionTokenHash(sessionToken);
     const columns = ['user_id', 'session_token', 'expires_at'];
-    const values = [userId, sessionToken, expiresAt];
+    const values = [userId, hashedSessionToken, expiresAt];
 
     if (await this.hasColumn('user_sessions', 'ip_address')) {
       columns.push('ip_address');
-      values.push(ipAddress);
+      values.push(normalizeText(ipAddress, { maxLength: 64 }) || null);
     }
 
     if (await this.hasColumn('user_sessions', 'user_agent')) {
       columns.push('user_agent');
-      values.push(userAgent);
+      values.push(normalizeUserAgent(userAgent) || null);
     }
 
     if (await this.hasColumn('user_sessions', 'is_active')) {
@@ -256,18 +483,46 @@ class User {
       values
     );
 
+    await this.pruneExcessSessions(userId);
+
     return {
       id: result[0].id,
       user_id: userId,
-      session_token: sessionToken,
+      session_token: hashedSessionToken,
       expires_at: expiresAt
     };
   }
 
+  static async pruneExcessSessions(userId) {
+    const maxActiveSessions = getMaxActiveSessions();
+    const orderBy = (await this.hasColumn('user_sessions', 'last_accessed'))
+      ? 'COALESCE(last_accessed, created_at) DESC'
+      : 'created_at DESC';
+
+    if (!Number.isFinite(maxActiveSessions) || maxActiveSessions < 1) {
+      return 0;
+    }
+
+    const result = await database.execute(
+      `DELETE FROM user_sessions
+       WHERE id IN (
+         SELECT id
+         FROM user_sessions
+         WHERE user_id = $1
+         ORDER BY ${orderBy}
+         OFFSET $2
+       )`,
+      [userId, maxActiveSessions]
+    );
+
+    return result.rowCount || 0;
+  }
+
   static async findSessionByToken(userId, sessionToken) {
+    const hashedToken = createSessionTokenHash(sessionToken);
     const filters = [
       'user_id = $1',
-      'session_token = $2',
+      '(session_token = $2 OR session_token = $3)',
       'expires_at > NOW()'
     ];
 
@@ -277,7 +532,7 @@ class User {
 
     const sessions = await database.query(
       `SELECT * FROM user_sessions WHERE ${filters.join(' AND ')} LIMIT 1`,
-      [userId, sessionToken]
+      [userId, hashedToken, sessionToken]
     );
 
     return sessions[0] || null;
@@ -310,7 +565,8 @@ class User {
       return false;
     }
 
-    const filters = ['user_id = $1', 'session_token = $2'];
+    const hashedToken = createSessionTokenHash(sessionToken);
+    const filters = ['user_id = $1', '(session_token = $2 OR session_token = $3)'];
     if (await this.hasColumn('user_sessions', 'is_active')) {
       filters.push('is_active = TRUE');
     }
@@ -318,13 +574,14 @@ class User {
     const result = await database.execute(
       `UPDATE user_sessions SET last_accessed = NOW()
        WHERE ${filters.join(' AND ')}`,
-      [userId, sessionToken]
+      [userId, hashedToken, sessionToken]
     );
 
     return result.rowCount > 0;
   }
 
   static async invalidateSessionByToken(userId, sessionToken) {
+    const hashedToken = createSessionTokenHash(sessionToken);
     const updates = ['expires_at = NOW()'];
 
     if (await this.hasColumn('user_sessions', 'is_active')) {
@@ -334,8 +591,8 @@ class User {
     const result = await database.execute(
       `UPDATE user_sessions
        SET ${updates.join(', ')}
-       WHERE user_id = $1 AND session_token = $2`,
-      [userId, sessionToken]
+       WHERE user_id = $1 AND (session_token = $2 OR session_token = $3)`,
+      [userId, hashedToken, sessionToken]
     );
 
     return result.rowCount > 0;
@@ -366,6 +623,73 @@ class User {
     );
 
     return result.rowCount;
+  }
+
+  static createPasswordResetTokenHash(token) {
+    return createScopedHash('password-reset-token', token);
+  }
+
+  static async storePasswordResetToken(userId, rawToken, options = {}) {
+    const expiresAt = options.expiresAt instanceof Date ? options.expiresAt : new Date(Date.now() + 15 * 60 * 1000);
+    const tokenHash = this.createPasswordResetTokenHash(rawToken);
+
+    await this.invalidatePasswordResetTokens(userId);
+
+    const rows = await database.query(
+      `INSERT INTO password_reset_tokens (
+        user_id,
+        token_hash,
+        request_ip,
+        user_agent,
+        expires_at
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, expires_at`,
+      [
+        userId,
+        tokenHash,
+        normalizeText(options.ipAddress, { maxLength: 64 }) || null,
+        normalizeUserAgent(options.userAgent) || null,
+        expiresAt
+      ]
+    );
+
+    return rows[0] || null;
+  }
+
+  static async findValidPasswordResetToken(rawToken) {
+    const rows = await database.query(
+      `SELECT *
+       FROM password_reset_tokens
+       WHERE token_hash = $1
+         AND used_at IS NULL
+         AND expires_at > NOW()
+       LIMIT 1`,
+      [this.createPasswordResetTokenHash(rawToken)]
+    );
+
+    return rows[0] || null;
+  }
+
+  static async markPasswordResetTokenUsed(rawToken) {
+    const result = await database.execute(
+      `UPDATE password_reset_tokens
+       SET used_at = NOW()
+       WHERE token_hash = $1
+         AND used_at IS NULL`,
+      [this.createPasswordResetTokenHash(rawToken)]
+    );
+
+    return result.rowCount > 0;
+  }
+
+  static async invalidatePasswordResetTokens(userId) {
+    const result = await database.execute(
+      'DELETE FROM password_reset_tokens WHERE user_id = $1 OR expires_at <= NOW()',
+      [userId]
+    );
+
+    return result.rowCount > 0;
   }
 }
 

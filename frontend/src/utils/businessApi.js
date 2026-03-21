@@ -1,31 +1,28 @@
-const buildJsonOptions = (method, body, options = {}) => {
-  const headers = {
+import { fetchJson } from './http';
+
+const buildJsonOptions = (method, body, options = {}) => ({
+  method,
+  ...options,
+  headers: {
     ...(body ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers || {})
-  };
-
-  return {
-    method,
-    credentials: 'include',
-    ...options,
-    headers,
-    body: body ? JSON.stringify(body) : undefined
-  };
-};
+  },
+  body: body ? JSON.stringify(body) : undefined
+});
 
 const requestJson = async (url, options = {}) => {
-  const response = await fetch(url, options);
-  const payload = await response.json().catch(() => null);
-  const backendError =
-    payload?.error === 'Route non trouvee'
-      ? "Le service n'est pas encore disponible sur ce serveur. Verifiez le deploiement du backend."
-      : payload?.error || payload?.message;
+  try {
+    const { payload } = await fetchJson(url, options);
+    return payload;
+  } catch (error) {
+    if (error.message === 'Route non trouvee') {
+      throw new Error(
+        "Le service n'est pas encore disponible sur ce serveur. Verifiez le deploiement du backend."
+      );
+    }
 
-  if (!response.ok || payload?.success === false) {
-    throw new Error(backendError || 'Erreur de communication avec le serveur');
+    throw error;
   }
-
-  return payload || {};
 };
 
 export const listContactRequests = async () => {

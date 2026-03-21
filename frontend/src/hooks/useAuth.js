@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fetchJson } from '../utils/http';
 import { clearAuthSession, writeAuthSession } from '../utils/storage';
 
 export const useAuth = () => {
@@ -14,21 +15,9 @@ export const useAuth = () => {
 
   const checkAuthStatus = async () => {
     try {
-      const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-      const userData = localStorage.getItem('user');
+      const { payload } = await fetchJson('/api/auth/verify');
 
-      if (!isLoggedIn || !userData) {
-        setUser(null);
-        setIsAuthenticated(false);
-        return false;
-      }
-
-      const response = await fetch('/api/auth/verify', {
-        credentials: 'include'
-      });
-      const payload = await response.json();
-
-      if (!response.ok || !payload.success || !payload.user) {
+      if (!payload.user) {
         clearAuthSession();
         setUser(null);
         setIsAuthenticated(false);
@@ -64,6 +53,11 @@ export const useAuth = () => {
 
   const logout = () => {
     try {
+      fetchJson('/api/auth/logout', {
+        method: 'POST'
+      }).catch((error) => {
+        console.warn("Impossible de notifier la deconnexion cote serveur.", error);
+      });
       clearAuthSession();
       setUser(null);
       setIsAuthenticated(false);
