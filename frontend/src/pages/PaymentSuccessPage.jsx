@@ -2,182 +2,260 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicHero from '../components/PublicHero';
 import SiteFooter from '../components/SiteFooter';
+import { buildReceiptDocument, downloadReceiptPdf, openReceiptPrintWindow } from '../utils/paymentReceipt';
+import { readAuthUser, readJsonStorage, removeStorageKey } from '../utils/storage';
+import './PaymentSuccessPage.css';
 
 const nextSteps = [
   {
     index: '01',
-    title: 'Prise de contact',
-    text: 'Notre equipe revient vers vous pour confirmer le cadrage et la suite de production.'
+    title: 'Cadrage confirme',
+    text: 'Notre equipe verrouille les priorites du projet a partir du paiement et du devis valide.'
   },
   {
     index: '02',
-    title: 'Planification',
-    text: 'Nous validons les priorites, les contenus et le rythme de livraison.'
+    title: 'Organisation de production',
+    text: 'Le planning, les contenus et les points de validation sont prepares avec un cadre plus clair.'
   },
   {
     index: '03',
-    title: 'Production',
-    text: 'Le projet entre en execution avec un suivi plus propre et plus visible.'
+    title: 'Execution',
+    text: 'La production commence avec un suivi plus propre cote client et cote equipe.'
   },
   {
     index: '04',
-    title: 'Livraison',
-    text: 'Vous recevez le projet avec support, retours et prochaines options.'
+    title: 'Livraison et suivi',
+    text: 'Vous recevez les prochaines etapes, les retours utiles et le support associe au projet.'
   }
 ];
 
 const PaymentSuccessPage = () => {
   const [transaction, setTransaction] = useState(null);
   const [user, setUser] = useState(null);
+  const [actionError, setActionError] = useState('');
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      setUser(JSON.parse(userData));
-    }
+    setUser(readAuthUser());
 
-    const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+    const transactions = readJsonStorage('transactions', []);
+
     if (transactions.length > 0) {
       setTransaction(transactions[transactions.length - 1]);
     }
   }, []);
 
-  const formatDate = (timestamp) => {
-    return new Date(timestamp).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const receipt = buildReceiptDocument({ transaction, user });
+  const hasTransaction = Boolean(transaction);
+
+  const handleDownloadReceipt = async () => {
+    if (!hasTransaction) {
+      setActionError('Aucune transaction recente n est disponible pour le PDF.');
+      return;
+    }
+
+    setActionError('');
+    setIsDownloadingPdf(true);
+
+    try {
+      await downloadReceiptPdf(receipt);
+    } catch (error) {
+      setActionError(error.message || 'Impossible de generer le PDF pour le moment.');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
-  const handleDownloadReceipt = () => {
-    const receiptContent = [
-      'YTECH - Recu de paiement',
-      '========================',
-      '',
-      `Date : ${formatDate(transaction?.timestamp || new Date().toISOString())}`,
-      `Numero de transaction : ${transaction?.id || 'N/A'}`,
-      '',
-      `Client : ${user?.name || 'N/A'}`,
-      `Email : ${user?.email || 'N/A'}`,
-      '',
-      `Projet : ${transaction?.service || transaction?.planName || 'N/A'}`,
-      `Reference devis : ${transaction?.quoteId || 'N/A'}`,
-      `Montant : ${transaction?.amount || '0'} ${transaction?.currency || 'MAD'}`,
-      `Moyen : ${transaction?.paymentLabel || 'Paiement securise'}`,
-      `Email de recu : ${transaction?.paymentEmail || user?.email || 'N/A'}`,
-      `Statut : ${transaction?.status || 'completed'}`,
-      '',
-      'Merci pour votre confiance dans YTECH.',
-      '',
-      'Contact :',
-      'contact@ytech.ma',
-      '+212 6 00 00 00 00',
-      'Casablanca, Maroc'
-    ].join('\n');
+  const handlePrintReceipt = () => {
+    if (!hasTransaction) {
+      setActionError('Aucune transaction recente n est disponible pour l impression.');
+      return;
+    }
 
-    const blob = new Blob([receiptContent], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `recu_ytech_${transaction?.id || Date.now()}.txt`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    window.URL.revokeObjectURL(url);
+    setActionError('');
+
+    const didOpenPrintWindow = openReceiptPrintWindow(receipt);
+
+    if (!didOpenPrintWindow) {
+      setActionError('La fenetre d impression a ete bloquee par le navigateur.');
+    }
+  };
+
+  const handleClearLocalReceiptData = () => {
+    const hasClearedStorage = removeStorageKey('transactions');
+
+    if (!hasClearedStorage) {
+      setActionError('Impossible de vider les donnees locales du recu pour le moment.');
+      return;
+    }
+
+    setActionError('');
+    setTransaction(null);
+    setIsDownloadingPdf(false);
   };
 
   return (
     <div className="marketing-page">
       <PublicHero
-        eyebrow="Paiement confirme"
-        title="Votre paiement a bien ete enregistre."
-        description="Merci pour votre confiance. Vous pouvez deja recuperer votre recu et consulter les prochaines etapes du projet."
+        eyebrow={hasTransaction ? 'Paiement confirme' : 'Recu indisponible'}
+        title={
+          hasTransaction
+            ? 'Votre paiement a bien ete enregistre.'
+            : 'Aucun recu recent n a ete retrouve pour le moment.'
+        }
+        description={
+          hasTransaction
+            ? 'Le recu a ete refait pour etre plus propre a lire, plus net a imprimer et telechargeable directement en PDF.'
+            : 'Retournez dans votre espace client apres un paiement pour recuperer le recu et imprimer les details de transaction.'
+        }
         actions={[
           { to: '/dashboard', label: 'Retour au dashboard', variant: 'primary' },
           { to: '/contact?intent=support', label: 'Contacter le support', variant: 'secondary' }
         ]}
-        highlights={['Transaction securisee', 'Confirmation enregistree', 'Equipe notifiee']}
+        highlights={
+          hasTransaction
+            ? ['PDF pret a partager', 'Impression dediee', 'Details plus propres']
+            : ['Dashboard client', 'Support YTECH', 'Recu apres paiement']
+        }
         tone="success"
         aside={
-          <>
+          <div className="payment-success-hero">
             <span className="hero-panel__eyebrow">Recu</span>
-            <h2 className="hero-panel__title">Transaction #{transaction?.id || 'N/A'}</h2>
+            <h2 className="hero-panel__title">
+              {hasTransaction ? `Transaction #${receipt.transactionId}` : 'Espace de recu'}
+            </h2>
             <p className="hero-panel__text">
-              Votre confirmation reste disponible sur cette page et dans votre espace client.
+              {hasTransaction
+                ? 'Le document est pret pour export PDF, impression propre et partage avec votre client ou votre equipe.'
+                : 'Le recu apparaitra automatiquement ici des qu une transaction sera enregistree.'}
             </p>
             <ul className="hero-panel__list">
-              <li>Projet : {transaction?.service || transaction?.planName || 'N/A'}</li>
-              <li>Date : {formatDate(transaction?.timestamp || new Date().toISOString())}</li>
-              <li>Montant : {transaction?.amount?.toLocaleString() || '0'} {transaction?.currency || 'MAD'}</li>
-              <li>Moyen : {transaction?.paymentLabel || 'Paiement securise'}</li>
+              <li>Projet : {receipt.projectLabel}</li>
+              <li>Date : {receipt.issuedAtLabel}</li>
+              <li>Montant : {receipt.amountLabel}</li>
+              <li>Moyen : {receipt.paymentDetail}</li>
             </ul>
-          </>
+          </div>
         }
       />
 
       <section className="marketing-section">
         <div className="container">
-          <div className="receipt-card">
-            <h2 className="receipt-card__title">Details de la transaction</h2>
-            <ul className="receipt-list">
-              <li>
-                <span>Client</span>
-                <strong>{user?.name || 'N/A'}</strong>
-              </li>
-              <li>
-                <span>Email</span>
-                <strong>{user?.email || 'N/A'}</strong>
-              </li>
-              <li>
-                <span>Projet</span>
-                <strong>{transaction?.service || transaction?.planName || 'N/A'}</strong>
-              </li>
-              {transaction?.quoteId ? (
-                <li>
-                  <span>Devis</span>
-                  <strong>{transaction.quoteId}</strong>
-                </li>
-              ) : null}
-              <li>
-                <span>Date</span>
-                <strong>{formatDate(transaction?.timestamp || new Date().toISOString())}</strong>
-              </li>
-              <li>
-                <span>Moyen</span>
-                <strong>{transaction?.paymentLabel || 'Paiement securise'}</strong>
-              </li>
-              {transaction?.paymentEmail ? (
-                <li>
+          {hasTransaction ? (
+            <div className="payment-success-layout">
+              <article className="receipt-sheet">
+                <div className="receipt-sheet__top">
+                  <div>
+                    <span className="receipt-sheet__eyebrow">Recu PDF</span>
+                    <h2 className="receipt-sheet__title">Details de transaction retravailles</h2>
+                    <p className="receipt-sheet__intro">
+                      Le recu ne sort plus en fichier texte. Il est maintenant pense comme un vrai document de paiement.
+                    </p>
+                  </div>
+                  <div className="receipt-sheet__status">{receipt.paymentStatus}</div>
+                </div>
+
+                <div className="receipt-sheet__hero">
+                  <div className="receipt-sheet__hero-copy">
+                    <span className="receipt-sheet__label">Transaction</span>
+                    <strong className="receipt-sheet__id">#{receipt.transactionId}</strong>
+                    <p>{receipt.summaryNote}</p>
+                  </div>
+
+                  <div className="receipt-sheet__amount">
+                    <span>Montant regle</span>
+                    <strong>{receipt.amountLabel}</strong>
+                    <small>{receipt.issuedAtLabel}</small>
+                  </div>
+                </div>
+
+                <div className="receipt-sheet__grid">
+                  {receipt.sections.map((section) => (
+                    <section key={section.title} className="receipt-section-card">
+                      <h3>{section.title}</h3>
+                      <div className="receipt-section-card__rows">
+                        {section.rows.map((row) => (
+                          <div key={`${section.title}-${row.label}`} className="receipt-section-card__row">
+                            <span>{row.label}</span>
+                            <strong>{row.value}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+
+                {actionError ? <div className="marketing-alert payment-success-alert">{actionError}</div> : null}
+
+                <div className="success-card__actions payment-success-actions">
+                  <button
+                    type="button"
+                    className="marketing-button marketing-button--dark"
+                    onClick={handleDownloadReceipt}
+                    disabled={isDownloadingPdf}
+                  >
+                    {isDownloadingPdf ? 'Generation du PDF...' : 'Telecharger le recu en PDF'}
+                  </button>
+                  <button
+                    type="button"
+                    className="marketing-button marketing-button--accent"
+                    onClick={handlePrintReceipt}
+                  >
+                    Imprimer le recu
+                  </button>
+                  <button
+                    type="button"
+                    className="marketing-button marketing-button--secondary"
+                    onClick={handleClearLocalReceiptData}
+                  >
+                    Vider les donnees locales
+                  </button>
+                </div>
+
+                <p className="marketing-note payment-success-local-note">
+                  Cette action efface seulement le recu stocke dans votre navigateur pour remettre l ecran a vide.
+                </p>
+              </article>
+
+              <aside className="receipt-sidecard">
+                <span className="receipt-sidecard__eyebrow">Mise a jour</span>
+                <h3 className="receipt-sidecard__title">Le recu est maintenant plus presentable.</h3>
+                <p className="receipt-sidecard__text">
+                  Le document garde un format plus professionnel pour partage client, archivage interne et impression papier.
+                </p>
+                <ul className="receipt-sidecard__list">
+                  <li>Export direct en PDF au lieu d un fichier `.txt`</li>
+                  <li>Impression depuis un document dedie, sans la page marketing autour</li>
+                  <li>Details regroupes par blocs plus lisibles</li>
+                </ul>
+
+                <div className="receipt-sidecard__meta">
                   <span>Email de recu</span>
-                  <strong>{transaction.paymentEmail}</strong>
-                </li>
-              ) : null}
-            </ul>
-
-            <div className="receipt-card__amount">
-              {transaction?.amount?.toLocaleString() || '0'} {transaction?.currency || 'MAD'}
+                  <strong>{receipt.paymentEmail}</strong>
+                </div>
+                <div className="receipt-sidecard__meta">
+                  <span>Support</span>
+                  <strong>{receipt.supportEmail}</strong>
+                </div>
+              </aside>
             </div>
-
-            <div className="success-card__actions marketing-mt-md">
-              <button
-                type="button"
-                className="marketing-button marketing-button--dark"
-                onClick={handleDownloadReceipt}
-              >
-                Telecharger le recu
-              </button>
-              <button
-                type="button"
-                className="marketing-button marketing-button--accent"
-                onClick={() => window.print()}
-              >
-                Imprimer
-              </button>
+          ) : (
+            <div className="success-card payment-success-empty">
+              <div className="success-card__icon">REC</div>
+              <h2 className="success-card__title">Aucune transaction recente</h2>
+              <p className="success-card__text">
+                Cette page affiche le dernier recu enregistre dans votre espace client. Lancez un paiement puis revenez ici pour exporter le PDF.
+              </p>
+              <div className="success-card__actions">
+                <Link to="/payment" className="marketing-button marketing-button--dark">
+                  Aller au paiement
+                </Link>
+                <Link to="/dashboard" className="marketing-button marketing-button--accent">
+                  Retour au dashboard
+                </Link>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -185,7 +263,7 @@ const PaymentSuccessPage = () => {
         <div className="container">
           <div className="section-heading section-heading--center">
             <span className="section-heading__eyebrow">Suite du projet</span>
-            <h2 className="section-heading__title">La transaction est faite. Voici comment la suite se deroule.</h2>
+            <h2 className="section-heading__title">Le paiement est confirme. La suite se deroule comme ceci.</h2>
           </div>
 
           <div className="step-grid">
@@ -200,7 +278,7 @@ const PaymentSuccessPage = () => {
         </div>
       </section>
 
-      <SiteFooter note="Un ecran de confirmation plus propre pour rassurer, recapitulatif inclus, apres le paiement." />
+      <SiteFooter note="Le recu de paiement est maintenant plus propre a consulter, a imprimer et a telecharger en PDF." />
     </div>
   );
 };

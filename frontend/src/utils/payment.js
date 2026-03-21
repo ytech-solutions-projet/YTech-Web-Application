@@ -1,5 +1,18 @@
+const normalizeLocalizedDigits = (value) =>
+  `${value ?? ''}`
+    .normalize('NFKC')
+    .replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (character) => {
+      const codePoint = character.codePointAt(0);
+
+      if (codePoint >= 0x0660 && codePoint <= 0x0669) {
+        return String(codePoint - 0x0660);
+      }
+
+      return String(codePoint - 0x06f0);
+    });
+
 const sanitizeDigits = (value, maxLength = 19) =>
-  `${value ?? ''}`.replace(/\D/g, '').slice(0, maxLength);
+  normalizeLocalizedDigits(value).replace(/\D/g, '').slice(0, maxLength);
 
 export const detectCardBrand = (value) => {
   const digits = sanitizeDigits(value);

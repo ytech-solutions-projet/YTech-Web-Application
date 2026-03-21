@@ -32,6 +32,16 @@ export const writeJsonStorage = (key, value) => {
   }
 };
 
+export const removeStorageKey = (key) => {
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch (error) {
+    console.error(`Impossible de supprimer la cle ${key} du stockage local.`, error);
+    return false;
+  }
+};
+
 export const buildAuthUser = (user = {}) => {
   return {
     id: user.id,
