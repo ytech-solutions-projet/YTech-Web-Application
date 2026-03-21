@@ -1,7 +1,7 @@
 # 🚀 YTECH Web Application
 
 <p align="center">
-  <img src="./docs/banner.svg" alt="YTECH Web Application banner" width="100%" />
+  <img src="docs/banner.svg" alt="YTECH Web Application banner" width="100%" />
 </p>
 
 <p align="center">
@@ -14,6 +14,8 @@
 <p align="center">
   Site vitrine, espace client, espace admin, devis, paiement, messagerie et suivi projet dans une seule application.
 </p>
+
+Les visuels utilises dans ce README sont versionnes dans `docs/`.
 
 ---
 
@@ -32,7 +34,7 @@ YTECH Web Application est une plateforme full stack qui permet de :
 ## 🖼️ Parcours Principal
 
 <p align="center">
-  <img src="./docs/workflow.svg" alt="Workflow devis paiement projet" width="100%" />
+  <img src="docs/workflow.svg" alt="Workflow devis paiement projet" width="100%" />
 </p>
 
 Le flow principal est le suivant :
@@ -88,7 +90,7 @@ Le flow principal est le suivant :
 ## 🏗️ Deploiement Recommande
 
 <p align="center">
-  <img src="./docs/deployment.svg" alt="Architecture web-server db-server" width="100%" />
+  <img src="docs/deployment.svg" alt="Architecture web-server db-server" width="100%" />
 </p>
 
 Architecture conseillee :

@@ -1,0 +1,32 @@
+<svg width="1280" height="520" viewBox="0 0 1280 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="520" rx="32" fill="#F8F4ED"/>
+  <text x="80" y="86" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">Workflow principal</text>
+  <text x="80" y="122" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Devis, validation admin, paiement et passage en production.</text>
+
+  <rect x="80" y="180" width="250" height="220" rx="24" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="112" y="222" fill="#F97316" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">ETAPE 01</text>
+  <text x="112" y="270" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Demande de devis</text>
+  <text x="112" y="320" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">Le client choisit un service, ajoute ses options et son delai.</text>
+
+  <rect x="386" y="180" width="250" height="220" rx="24" fill="#102B4E"/>
+  <text x="418" y="222" fill="#7DD3FC" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">ETAPE 02</text>
+  <text x="418" y="270" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Validation admin</text>
+  <text x="418" y="320" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="17">L admin accepte ou refuse et peut fixer le montant a payer.</text>
+
+  <rect x="692" y="180" width="250" height="220" rx="24" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="724" y="222" fill="#14B8A6" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">ETAPE 03</text>
+  <text x="724" y="270" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Paiement</text>
+  <text x="724" y="320" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">Le client paie depuis le dashboard ou la page paiement.</text>
+
+  <rect x="998" y="180" width="202" height="220" rx="24" fill="#1F6B70"/>
+  <text x="1030" y="222" fill="#A7F3D0" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">ETAPE 04</text>
+  <text x="1030" y="270" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Projet en cours</text>
+  <text x="1030" y="320" fill="#D8F3EE" font-family="Segoe UI, Arial, sans-serif" font-size="17">Le devis passe en production et reste visible dans le suivi.</text>
+
+  <path d="M330 290H374" stroke="#94A3B8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M636 290H680" stroke="#94A3B8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M942 290H986" stroke="#94A3B8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M362 272L386 290L362 308" fill="none" stroke="#94A3B8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M668 272L692 290L668 308" fill="none" stroke="#94A3B8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M974 272L998 290L974 308" fill="none" stroke="#94A3B8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

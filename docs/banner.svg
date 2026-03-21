@@ -1,0 +1,43 @@
+<svg width="1280" height="420" viewBox="0 0 1280 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="1180" y2="380" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="0.5" stop-color="#102B4E"/>
+      <stop offset="1" stop-color="#1F6B70"/>
+    </linearGradient>
+    <linearGradient id="pill" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F97316"/>
+      <stop offset="1" stop-color="#14B8A6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="420" rx="32" fill="#F4EFE7"/>
+  <rect x="28" y="28" width="1224" height="364" rx="28" fill="url(#bg)"/>
+  <circle cx="1080" cy="120" r="130" fill="#FFFFFF" fill-opacity="0.06"/>
+  <circle cx="1135" cy="290" r="92" fill="#F97316" fill-opacity="0.12"/>
+  <circle cx="980" cy="300" r="58" fill="#14B8A6" fill-opacity="0.14"/>
+
+  <text x="88" y="108" fill="#7DD3FC" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="3">YTECH SOLUTIONS</text>
+  <text x="88" y="180" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="58" font-weight="700">Web Application</text>
+  <text x="88" y="228" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="24">Site vitrine, espace client, dashboard admin, devis, paiement et messagerie.</text>
+
+  <rect x="88" y="278" width="158" height="38" rx="19" fill="url(#pill)"/>
+  <text x="118" y="303" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">React 18</text>
+
+  <rect x="260" y="278" width="170" height="38" rx="19" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="298" y="303" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">Node.js API</text>
+
+  <rect x="444" y="278" width="184" height="38" rx="19" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="484" y="303" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">PostgreSQL</text>
+
+  <rect x="642" y="278" width="178" height="38" rx="19" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="674" y="303" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">Admin Flow</text>
+
+  <rect x="920" y="104" width="240" height="84" rx="22" fill="#FFFFFF" fill-opacity="0.1" stroke="#FFFFFF" stroke-opacity="0.18"/>
+  <text x="950" y="136" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">Client Dashboard</text>
+  <text x="950" y="165" fill="#C7D9EA" font-family="Segoe UI, Arial, sans-serif" font-size="14">Suivi projet + paiement</text>
+
+  <rect x="870" y="204" width="290" height="84" rx="22" fill="#FFFFFF" fill-opacity="0.1" stroke="#FFFFFF" stroke-opacity="0.18"/>
+  <text x="900" y="236" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">Admin Dashboard</text>
+  <text x="900" y="265" fill="#C7D9EA" font-family="Segoe UI, Arial, sans-serif" font-size="14">Validation devis + messages + suivi</text>
+</svg>
