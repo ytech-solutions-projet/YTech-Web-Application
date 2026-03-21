@@ -1,7 +1,19 @@
 const PDF_PAGE_WIDTH = 595.28;
 const PDF_PAGE_HEIGHT = 841.89;
 const RECEIPT_CANVAS_WIDTH = 1240;
-const RECEIPT_CANVAS_HEIGHT = 1754;
+const RECEIPT_PAGE_CANVAS_HEIGHT = 1754;
+const RECEIPT_SHEET_X = 70;
+const RECEIPT_SHEET_Y = 60;
+const RECEIPT_SHEET_WIDTH = 1100;
+const RECEIPT_SHEET_HEIGHT = 1634;
+const RECEIPT_SECTION_X = 118;
+const RECEIPT_SECTION_WIDTH = 952;
+const RECEIPT_FIRST_PAGE_MIN_HERO_TOP = 320;
+const RECEIPT_FIRST_PAGE_SECTION_GAP = 46;
+const RECEIPT_FIRST_PAGE_CONTENT_START = 568;
+const RECEIPT_CONTINUATION_PAGE_CONTENT_START = 278;
+const RECEIPT_PAGE_CONTENT_END = 1496;
+const RECEIPT_FOOTER_BASELINE_Y = 1560;
 
 const normalizeText = (value, fallback = 'N/A') => {
   const text = `${value ?? ''}`.trim();
@@ -261,6 +273,8 @@ const buildPrintHtml = (receipt) => `
         grid-template-columns: 1.3fr 0.9fr;
         gap: 18px;
         padding: 28px;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
 
       .receipt-print__hero-card,
@@ -332,6 +346,8 @@ const buildPrintHtml = (receipt) => `
         border-radius: 22px;
         background: #ffffff;
         padding: 20px;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
 
       .receipt-print__section h3 {
@@ -352,6 +368,8 @@ const buildPrintHtml = (receipt) => `
         padding: 14px 16px;
         border-radius: 16px;
         background: #faf4eb;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
 
       .receipt-print__row span {
@@ -399,6 +417,14 @@ const buildPrintHtml = (receipt) => `
           border: none;
           border-radius: 0;
           box-shadow: none;
+        }
+
+        .receipt-print__grid {
+          display: block;
+        }
+
+        .receipt-print__section {
+          margin-bottom: 16px;
         }
       }
     </style>
@@ -563,6 +589,141 @@ const measureSection = (context, width, section) => {
   return height;
 };
 
+const measureTopCards = (context, receipt) => {
+  context.font = '700 34px "Segoe UI", Arial, sans-serif';
+  const transactionIdLines = wrapText(context, `#${receipt.transactionId}`, 500);
+
+  context.font = '400 24px "Segoe UI", Arial, sans-serif';
+  const projectLines = wrapText(context, `Projet: ${receipt.projectLabel}`, 500);
+  const referenceLines = wrapText(context, `Reference: ${receipt.quoteReference}`, 500);
+
+  context.font = '800 48px "Segoe UI", Arial, sans-serif';
+  const amountLines = wrapText(context, receipt.amountLabel, 260);
+
+  context.font = '400 20px "Segoe UI", Arial, sans-serif';
+  const issuedAtLines = wrapText(context, receipt.issuedAtLabel, 260);
+
+  const leftHeight = Math.max(
+    202,
+    38 +
+      26 +
+      28 +
+      transactionIdLines.length * 40 +
+      8 +
+      projectLines.length * 30 +
+      8 +
+      referenceLines.length * 30 +
+      34
+  );
+
+  const rightHeight = Math.max(
+    202,
+    38 + 26 + 30 + amountLines.length * 52 + 12 + issuedAtLines.length * 26 + 34
+  );
+
+  return {
+    transactionIdLines,
+    projectLines,
+    referenceLines,
+    amountLines,
+    issuedAtLines,
+    heroHeight: Math.max(leftHeight, rightHeight)
+  };
+};
+
+const buildReceiptLayout = (context, receipt) => {
+  context.font = '400 26px "Segoe UI", Arial, sans-serif';
+  const introLines = wrapText(context, receipt.summaryNote, 590);
+  const heroTop = Math.max(
+    RECEIPT_FIRST_PAGE_MIN_HERO_TOP,
+    246 + introLines.length * 32 + 42
+  );
+  const topCards = measureTopCards(context, receipt);
+  const firstPageContentStart = Math.max(
+    RECEIPT_FIRST_PAGE_CONTENT_START,
+    heroTop + topCards.heroHeight + RECEIPT_FIRST_PAGE_SECTION_GAP
+  );
+  const sectionLayouts = [];
+  let pageIndex = 0;
+  let cursorY = firstPageContentStart;
+
+  receipt.sections.forEach((section) => {
+    const sectionHeight = measureSection(context, RECEIPT_SECTION_WIDTH, section);
+
+    if (cursorY + sectionHeight > RECEIPT_PAGE_CONTENT_END) {
+      pageIndex += 1;
+      cursorY = RECEIPT_CONTINUATION_PAGE_CONTENT_START;
+    }
+
+    sectionLayouts.push({
+      section,
+      height: sectionHeight,
+      pageIndex,
+      y: cursorY
+    });
+
+    cursorY += sectionHeight + 24;
+  });
+
+  const footerPageIndex = pageIndex;
+  const footerY = Math.max(cursorY + 28, RECEIPT_FOOTER_BASELINE_Y);
+
+  return {
+    footerPageIndex,
+    footerY,
+    introLines,
+    sections: sectionLayouts,
+    topCards,
+    totalPages: footerPageIndex + 1,
+    firstPageContentStart,
+    heroTop
+  };
+};
+
+const getPageOffset = (pageIndex) => pageIndex * RECEIPT_PAGE_CANVAS_HEIGHT;
+
+const drawStatusPill = (context, label, x, y, width = 170) => {
+  drawRoundedRect(context, x, y, width, 48, 24);
+  context.fillStyle = '#12243d';
+  context.fill();
+  context.fillStyle = '#fffaf4';
+  context.font = '700 16px "Segoe UI", Arial, sans-serif';
+  context.textAlign = 'center';
+  context.fillText(label.toUpperCase(), x + width / 2, y + 31);
+  context.textAlign = 'left';
+};
+
+const drawReceiptPageBackground = (context, pageIndex) => {
+  const offsetY = getPageOffset(pageIndex);
+
+  context.fillStyle = '#efe4d4';
+  context.fillRect(0, offsetY, RECEIPT_CANVAS_WIDTH, RECEIPT_PAGE_CANVAS_HEIGHT);
+
+  context.fillStyle = '#e4d1bb';
+  context.beginPath();
+  context.arc(1080, offsetY + 160, 220, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = '#d9baa1';
+  context.beginPath();
+  context.arc(1120, offsetY + 220, 120, 0, Math.PI * 2);
+  context.fill();
+
+  drawRoundedRect(
+    context,
+    RECEIPT_SHEET_X,
+    offsetY + RECEIPT_SHEET_Y,
+    RECEIPT_SHEET_WIDTH,
+    RECEIPT_SHEET_HEIGHT,
+    42
+  );
+  context.fillStyle = '#fffaf4';
+  context.fill();
+  context.strokeStyle = '#d8c6b1';
+  context.lineWidth = 3;
+  context.stroke();
+};
+
 const drawSection = (context, section, x, y, width) => {
   const sectionHeight = measureSection(context, width, section);
   const contentWidth = width - 64;
@@ -609,41 +770,7 @@ const drawSection = (context, section, x, y, width) => {
   return y + sectionHeight + 24;
 };
 
-const drawReceiptCanvas = async (receipt) => {
-  if (typeof document !== 'undefined' && document.fonts?.ready) {
-    try {
-      await document.fonts.ready;
-    } catch (error) {
-      // Rien a faire: on garde les fontes de repli.
-    }
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = RECEIPT_CANVAS_WIDTH;
-  canvas.height = RECEIPT_CANVAS_HEIGHT;
-
-  const context = canvas.getContext('2d');
-
-  context.fillStyle = '#efe4d4';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  context.fillStyle = '#e4d1bb';
-  context.beginPath();
-  context.arc(1080, 160, 220, 0, Math.PI * 2);
-  context.fill();
-
-  context.fillStyle = '#d9baa1';
-  context.beginPath();
-  context.arc(1120, 220, 120, 0, Math.PI * 2);
-  context.fill();
-
-  drawRoundedRect(context, 70, 60, 1100, 1634, 42);
-  context.fillStyle = '#fffaf4';
-  context.fill();
-  context.strokeStyle = '#d8c6b1';
-  context.lineWidth = 3;
-  context.stroke();
-
+const drawFirstPageHeader = (context, receipt, layout) => {
   context.fillStyle = '#a14d2b';
   context.font = '700 22px "Segoe UI", Arial, sans-serif';
   context.fillText('YTECH RECEIPT', 118, 138);
@@ -654,69 +781,198 @@ const drawReceiptCanvas = async (receipt) => {
 
   context.fillStyle = '#586678';
   context.font = '400 26px "Segoe UI", Arial, sans-serif';
-  wrapText(context, receipt.summaryNote, 590).forEach((line, index) => {
+  layout.introLines.forEach((line, index) => {
     context.fillText(line, 118, 246 + index * 32);
   });
 
-  drawRoundedRect(context, 910, 118, 170, 48, 24);
-  context.fillStyle = '#12243d';
-  context.fill();
-  context.fillStyle = '#fffaf4';
-  context.font = '700 16px "Segoe UI", Arial, sans-serif';
-  context.fillText('CONFIRME', 954, 149);
+  drawStatusPill(context, receipt.paymentStatus, 910, 118);
 
-  drawRoundedRect(context, 118, 320, 590, 202, 32);
+  if (layout.totalPages > 1) {
+    context.fillStyle = '#586678';
+    context.font = '600 18px "Segoe UI", Arial, sans-serif';
+    context.textAlign = 'right';
+    context.fillText(`Page 1/${layout.totalPages}`, 1070, 192);
+    context.textAlign = 'left';
+  }
+};
+
+const drawFirstPageHero = (context, receipt, layout) => {
+  const heroTop = layout.heroTop;
+  const heroHeight = layout.topCards.heroHeight;
+  const leftX = RECEIPT_SECTION_X;
+  const rightX = 734;
+
+  drawRoundedRect(context, leftX, heroTop, 590, heroHeight, 32);
   context.fillStyle = '#f8efe2';
   context.fill();
   context.strokeStyle = '#e7d8c6';
+  context.lineWidth = 2;
   context.stroke();
 
   context.fillStyle = '#6a778b';
   context.font = '600 18px "Segoe UI", Arial, sans-serif';
-  context.fillText('TRANSACTION', 156, 374);
+  context.fillText('TRANSACTION', leftX + 38, heroTop + 54);
+
+  let cursorY = heroTop + 104;
+
   context.fillStyle = '#12243d';
   context.font = '700 34px "Segoe UI", Arial, sans-serif';
-  context.fillText(`#${receipt.transactionId}`, 156, 424);
+  layout.topCards.transactionIdLines.forEach((line) => {
+    context.fillText(line, leftX + 38, cursorY);
+    cursorY += 40;
+  });
+
+  cursorY += 8;
   context.fillStyle = '#586678';
   context.font = '400 24px "Segoe UI", Arial, sans-serif';
-  context.fillText(`Projet: ${receipt.projectLabel}`, 156, 470);
-  context.fillText(`Reference: ${receipt.quoteReference}`, 156, 506);
+  layout.topCards.projectLines.forEach((line) => {
+    context.fillText(line, leftX + 38, cursorY);
+    cursorY += 30;
+  });
 
-  drawRoundedRect(context, 734, 320, 336, 202, 32);
+  cursorY += 8;
+  layout.topCards.referenceLines.forEach((line) => {
+    context.fillText(line, leftX + 38, cursorY);
+    cursorY += 30;
+  });
+
+  drawRoundedRect(context, rightX, heroTop, 336, heroHeight, 32);
   context.fillStyle = '#12243d';
   context.fill();
+
   context.fillStyle = '#d9e4f2';
   context.font = '600 18px "Segoe UI", Arial, sans-serif';
-  context.fillText('MONTANT REGLE', 772, 374);
+  context.fillText('MONTANT REGLE', rightX + 38, heroTop + 54);
+
+  cursorY = heroTop + 106;
   context.fillStyle = '#fffaf4';
   context.font = '800 48px "Segoe UI", Arial, sans-serif';
-  const amountLines = wrapText(context, receipt.amountLabel, 260);
-  amountLines.forEach((line, index) => {
-    context.fillText(line, 772, 440 + index * 52);
+  layout.topCards.amountLines.forEach((line) => {
+    context.fillText(line, rightX + 38, cursorY);
+    cursorY += 52;
   });
+
+  cursorY += 4;
   context.fillStyle = '#d9e4f2';
   context.font = '400 20px "Segoe UI", Arial, sans-serif';
-  context.fillText(receipt.issuedAtLabel, 772, 492);
-
-  let cursorY = 568;
-
-  receipt.sections.forEach((section) => {
-    cursorY = drawSection(context, section, 118, cursorY, 952);
+  layout.topCards.issuedAtLines.forEach((line) => {
+    context.fillText(line, rightX + 38, cursorY);
+    cursorY += 26;
   });
+};
+
+const drawContinuationHeader = (context, receipt, pageIndex, totalPages) => {
+  const offsetY = getPageOffset(pageIndex);
+
+  context.fillStyle = '#a14d2b';
+  context.font = '700 22px "Segoe UI", Arial, sans-serif';
+  context.fillText('YTECH RECEIPT', 118, offsetY + 138);
+
+  context.fillStyle = '#12243d';
+  context.font = '800 46px "Segoe UI", Arial, sans-serif';
+  context.fillText('Suite du recu', 118, offsetY + 194);
+
+  context.fillStyle = '#586678';
+  context.font = '400 22px "Segoe UI", Arial, sans-serif';
+  wrapText(
+    context,
+    `Transaction #${receipt.transactionId} - ${receipt.projectLabel}`,
+    720
+  ).forEach((line, index) => {
+    context.fillText(line, 118, offsetY + 234 + index * 28);
+  });
+
+  drawStatusPill(context, receipt.paymentStatus, 910, offsetY + 118);
+
+  context.fillStyle = '#586678';
+  context.font = '600 18px "Segoe UI", Arial, sans-serif';
+  context.textAlign = 'right';
+  context.fillText(`Page ${pageIndex + 1}/${totalPages}`, 1070, offsetY + 194);
+  context.textAlign = 'left';
+};
+
+const drawFooter = (context, pageIndex, footerY, totalPages) => {
+  const offsetY = getPageOffset(pageIndex);
+  const baselineY = offsetY + footerY;
 
   context.strokeStyle = '#e7d8c6';
   context.lineWidth = 2;
   context.beginPath();
-  context.moveTo(118, 1560);
-  context.lineTo(1070, 1560);
+  context.moveTo(118, baselineY);
+  context.lineTo(1070, baselineY);
   context.stroke();
 
   context.fillStyle = '#586678';
   context.font = '400 22px "Segoe UI", Arial, sans-serif';
-  context.fillText('Document genere depuis votre espace client YTECH.', 118, 1616);
-  context.fillText('Ce recu est pret pour partage, impression et archivage PDF.', 118, 1650);
+  context.fillText('Document genere depuis votre espace client YTECH.', 118, baselineY + 56);
+  context.fillText('Ce recu est pret pour partage, impression et archivage PDF.', 118, baselineY + 90);
 
-  return canvas;
+  if (totalPages > 1) {
+    context.font = '600 18px "Segoe UI", Arial, sans-serif';
+    context.textAlign = 'right';
+    context.fillText(`Page ${pageIndex + 1}/${totalPages}`, 1070, baselineY + 90);
+    context.textAlign = 'left';
+  }
+};
+
+const sliceCanvasIntoPages = (canvas, totalPages) =>
+  Array.from({ length: totalPages }, (_, pageIndex) => {
+    const pageCanvas = document.createElement('canvas');
+    pageCanvas.width = canvas.width;
+    pageCanvas.height = RECEIPT_PAGE_CANVAS_HEIGHT;
+
+    const pageContext = pageCanvas.getContext('2d');
+    pageContext.drawImage(canvas, 0, -pageIndex * RECEIPT_PAGE_CANVAS_HEIGHT);
+
+    return pageCanvas;
+  });
+
+const drawReceiptCanvasPages = async (receipt) => {
+  if (typeof document !== 'undefined' && document.fonts?.ready) {
+    try {
+      await document.fonts.ready;
+    } catch (error) {
+      // Rien a faire: on garde les fontes de repli.
+    }
+  }
+
+  const measurementCanvas = document.createElement('canvas');
+  measurementCanvas.width = RECEIPT_CANVAS_WIDTH;
+  measurementCanvas.height = RECEIPT_PAGE_CANVAS_HEIGHT;
+
+  const measurementContext = measurementCanvas.getContext('2d');
+  const layout = buildReceiptLayout(measurementContext, receipt);
+  const canvas = document.createElement('canvas');
+  canvas.width = RECEIPT_CANVAS_WIDTH;
+  canvas.height = RECEIPT_PAGE_CANVAS_HEIGHT * layout.totalPages;
+
+  const context = canvas.getContext('2d');
+
+  Array.from({ length: layout.totalPages }, (_, pageIndex) => {
+    drawReceiptPageBackground(context, pageIndex);
+
+    if (pageIndex === 0) {
+      drawFirstPageHeader(context, receipt, layout);
+      drawFirstPageHero(context, receipt, layout);
+      return;
+    }
+
+    drawContinuationHeader(context, receipt, pageIndex, layout.totalPages);
+  });
+
+  layout.sections.forEach(({ pageIndex, section, y }) => {
+    drawSection(
+      context,
+      section,
+      RECEIPT_SECTION_X,
+      getPageOffset(pageIndex) + y,
+      RECEIPT_SECTION_WIDTH
+    );
+  });
+
+  drawFooter(context, layout.footerPageIndex, layout.footerY, layout.totalPages);
+
+  return sliceCanvasIntoPages(canvas, layout.totalPages);
 };
 
 const canvasToJpegBlob = (canvas) =>
@@ -740,13 +996,13 @@ const canvasToJpegBlob = (canvas) =>
     reject(new Error('La generation PDF n est pas supportee sur ce navigateur.'));
   });
 
-const buildPdfBlobFromJpeg = (imageBytes, imageWidth, imageHeight) => {
+const buildPdfBlobFromJpegs = (pages) => {
   const encoder = new TextEncoder();
-  const contentStream = `q\n${PDF_PAGE_WIDTH.toFixed(2)} 0 0 ${PDF_PAGE_HEIGHT.toFixed(2)} 0 0 cm\n/Im0 Do\nQ\n`;
-  const contentBytes = encoder.encode(contentStream);
   const offsets = [0];
   const parts = [];
   let totalLength = 0;
+  const pageCount = pages.length;
+  const objectCount = 2 + pageCount * 3;
 
   const pushPart = (part) => {
     parts.push(part);
@@ -763,43 +1019,68 @@ const buildPdfBlobFromJpeg = (imageBytes, imageWidth, imageHeight) => {
   pushText('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
 
   offsets[2] = totalLength;
-  pushText('2 0 obj\n<< /Type /Pages /Count 1 /Kids [3 0 R] >>\nendobj\n');
-
-  offsets[3] = totalLength;
   pushText(
-    `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PDF_PAGE_WIDTH.toFixed(2)} ${PDF_PAGE_HEIGHT.toFixed(
-      2
-    )}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`
+    `2 0 obj\n<< /Type /Pages /Count ${pageCount} /Kids [${pages
+      .map((_, pageIndex) => `${3 + pageIndex * 3} 0 R`)
+      .join(' ')}] >>\nendobj\n`
   );
 
-  offsets[4] = totalLength;
-  pushText(
-    `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>\nstream\n`
-  );
-  pushPart(imageBytes);
-  pushText('\nendstream\nendobj\n');
+  pages.forEach((page, pageIndex) => {
+    const pageObjectIndex = 3 + pageIndex * 3;
+    const imageObjectIndex = pageObjectIndex + 1;
+    const contentObjectIndex = pageObjectIndex + 2;
+    const imageName = `Im${pageIndex}`;
+    const contentBytes = encoder.encode(
+      `q\n${PDF_PAGE_WIDTH.toFixed(2)} 0 0 ${PDF_PAGE_HEIGHT.toFixed(2)} 0 0 cm\n/${imageName} Do\nQ\n`
+    );
 
-  offsets[5] = totalLength;
-  pushText(`5 0 obj\n<< /Length ${contentBytes.length} >>\nstream\n`);
-  pushPart(contentBytes);
-  pushText('endstream\nendobj\n');
+    offsets[pageObjectIndex] = totalLength;
+    pushText(
+      `${pageObjectIndex} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PDF_PAGE_WIDTH.toFixed(
+        2
+      )} ${PDF_PAGE_HEIGHT.toFixed(
+        2
+      )}] /Resources << /XObject << /${imageName} ${imageObjectIndex} 0 R >> >> /Contents ${contentObjectIndex} 0 R >>\nendobj\n`
+    );
+
+    offsets[imageObjectIndex] = totalLength;
+    pushText(
+      `${imageObjectIndex} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${page.width} /Height ${page.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.bytes.length} >>\nstream\n`
+    );
+    pushPart(page.bytes);
+    pushText('\nendstream\nendobj\n');
+
+    offsets[contentObjectIndex] = totalLength;
+    pushText(`${contentObjectIndex} 0 obj\n<< /Length ${contentBytes.length} >>\nstream\n`);
+    pushPart(contentBytes);
+    pushText('endstream\nendobj\n');
+  });
 
   const xrefOffset = totalLength;
-  pushText('xref\n0 6\n0000000000 65535 f \n');
+  pushText(`xref\n0 ${objectCount + 1}\n0000000000 65535 f \n`);
 
-  for (let index = 1; index <= 5; index += 1) {
+  for (let index = 1; index <= objectCount; index += 1) {
     pushText(`${String(offsets[index]).padStart(10, '0')} 00000 n \n`);
   }
 
-  pushText(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+  pushText(`trailer\n<< /Size ${objectCount + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
 
   return new Blob(parts, { type: 'application/pdf' });
 };
 
 export const downloadReceiptPdf = async (receipt) => {
-  const canvas = await drawReceiptCanvas(receipt);
-  const jpegBlob = await canvasToJpegBlob(canvas);
-  const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer());
-  const pdfBlob = buildPdfBlobFromJpeg(jpegBytes, canvas.width, canvas.height);
+  const pageCanvases = await drawReceiptCanvasPages(receipt);
+  const pages = await Promise.all(
+    pageCanvases.map(async (pageCanvas) => {
+      const jpegBlob = await canvasToJpegBlob(pageCanvas);
+
+      return {
+        bytes: new Uint8Array(await jpegBlob.arrayBuffer()),
+        width: pageCanvas.width,
+        height: pageCanvas.height
+      };
+    })
+  );
+  const pdfBlob = buildPdfBlobFromJpegs(pages);
   createDownload(pdfBlob, receipt.fileName);
 };
