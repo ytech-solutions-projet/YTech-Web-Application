@@ -145,6 +145,7 @@ const PaymentPage = () => {
   const quoteCurrency = linkedQuote?.metadata?.paymentCurrency || 'MAD';
   const canPayQuote = linkedQuote?.status === 'approved';
   const isQuoteAlreadyPaid = linkedQuote?.status === 'in_progress';
+  const isQuotePaymentLocked = Boolean(linkedQuote) && !canPayQuote && !isQuoteAlreadyPaid;
 
   const persistTransaction = (nextTransaction) => {
     const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
@@ -300,6 +301,43 @@ const PaymentPage = () => {
         </section>
 
         <SiteFooter note="Quand le paiement est deja valide, le parcours vous renvoie directement vers le suivi du projet." />
+      </div>
+    );
+  }
+
+  if (isQuotePaymentLocked) {
+    const isRejectedQuote = linkedQuote?.status === 'rejected';
+
+    return (
+      <div className="marketing-page">
+        <section className="success-state">
+          <div className="container">
+            <div className="success-card">
+              <div className="success-card__icon">{isRejectedQuote ? 'NO' : 'WAIT'}</div>
+              <h1 className="success-card__title">
+                {isRejectedQuote ? 'Paiement indisponible pour ce devis' : 'Paiement pas encore ouvert'}
+              </h1>
+              <p className="success-card__text">
+                {isRejectedQuote
+                  ? 'Ce devis a ete refuse ou doit etre recadre. Le paiement ne peut pas etre lance tant qu une nouvelle validation n a pas ete faite.'
+                  : 'Ce devis est encore en cours d analyse. Le bouton de paiement apparaitra automatiquement apres validation admin.'}
+              </p>
+              <div className="success-card__actions">
+                <Link to="/devis-management" className="marketing-button marketing-button--dark">
+                  Retour au suivi
+                </Link>
+                <Link
+                  to={isRejectedQuote ? '/contact?intent=quote-help' : '/dashboard'}
+                  className="marketing-button marketing-button--accent"
+                >
+                  {isRejectedQuote ? 'Revoir le besoin' : 'Voir le dashboard'}
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <SiteFooter note="Le paiement s ouvre seulement quand le devis a bien ete valide par l equipe." />
       </div>
     );
   }

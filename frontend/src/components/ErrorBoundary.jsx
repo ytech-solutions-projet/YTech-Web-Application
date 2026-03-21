@@ -5,24 +5,23 @@ import './ErrorBoundary.css';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { 
-      hasError: false, 
-      error: null, 
-      errorInfo: null 
+    this.state = {
+      hasError: false,
+      error: null,
+      errorInfo: null
     };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError() {
     return { hasError: true };
   }
 
   componentDidCatch(error, errorInfo) {
     this.setState({
-      error: error,
-      errorInfo: errorInfo
+      error,
+      errorInfo
     });
 
-    // Log error to logger
     logger.error('React Error Boundary caught an error', {
       error: error.message,
       stack: error.stack,
@@ -30,7 +29,6 @@ class ErrorBoundary extends React.Component {
       timestamp: Date.now()
     });
 
-    // In production, you might want to send this to an error reporting service
     if (process.env.NODE_ENV === 'production') {
       // Example: sendToErrorReporting(error, errorInfo);
     }
@@ -38,8 +36,7 @@ class ErrorBoundary extends React.Component {
 
   handleReset = () => {
     this.setState({ hasError: false, error: null, errorInfo: null });
-    
-    // Reload the page if reset doesn't work
+
     setTimeout(() => {
       window.location.reload();
     }, 1000);
@@ -51,28 +48,28 @@ class ErrorBoundary extends React.Component {
         <div className="error-boundary">
           <div className="error-content">
             <div className="error-icon">
-              <span>⚠️</span>
+              <span>WARN</span>
             </div>
-            
+
             <h1 className="error-title">
               Oops! Une erreur est survenue
             </h1>
-            
+
             <p className="error-message">
-              Nous sommes désolés, mais quelque chose s'est mal passé. 
-              Notre équipe a été notifiée et travaille sur une solution.
+              Nous sommes desoles, mais quelque chose s&apos;est mal passe.
+              Notre equipe a ete notifiee et travaille sur une solution.
             </p>
 
             {process.env.NODE_ENV === 'development' && this.state.error && (
               <details className="error-details">
-                <summary>Details de l'erreur (développement)</summary>
+                <summary>Details de l&apos;erreur (developpement)</summary>
                 <div className="error-stack">
                   <h4>Message:</h4>
                   <pre>{this.state.error.toString()}</pre>
-                  
+
                   <h4>Stack Trace:</h4>
                   <pre>{this.state.error.stack}</pre>
-                  
+
                   {this.state.errorInfo && (
                     <>
                       <h4>Component Stack:</h4>
@@ -84,27 +81,31 @@ class ErrorBoundary extends React.Component {
             )}
 
             <div className="error-actions">
-              <button 
+              <button
+                type="button"
                 onClick={this.handleReset}
                 className="btn btn-primary"
               >
-                Réessayer
+                Reessayer
               </button>
-              
-              <button 
-                onClick={() => window.location.href = '/'}
+
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = '/';
+                }}
                 className="btn btn-secondary"
               >
-                Retour à l'accueil
+                Retour a l&apos;accueil
               </button>
             </div>
 
             <div className="error-help">
               <h4>Que pouvez-vous faire ?</h4>
               <ul>
-                <li>Rafraîchir la page et réessayer</li>
-                <li>Vérifier votre connexion internet</li>
-                <li>Contacter notre support si le problème persiste</li>
+                <li>Rafraichir la page et reessayer</li>
+                <li>Verifier votre connexion internet</li>
+                <li>Contacter notre support si le probleme persiste</li>
               </ul>
             </div>
           </div>

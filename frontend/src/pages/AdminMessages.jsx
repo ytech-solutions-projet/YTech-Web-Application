@@ -305,8 +305,9 @@ const AdminMessages = () => {
                 </div>
               ) : (
                 conversations.map((conversation) => (
-                  <div
+                  <button
                     key={conversation.id}
+                    type="button"
                     className={[
                       'workspace-chat__conversation',
                       selectedConversationId === conversation.id ? 'active' : '',
@@ -315,6 +316,7 @@ const AdminMessages = () => {
                       .filter(Boolean)
                       .join(' ')}
                     onClick={() => setSelectedConversationId(conversation.id)}
+                    aria-pressed={selectedConversationId === conversation.id}
                   >
                     <div className="workspace-chat__conversation-top">
                       <div className="workspace-chat__conversation-name">{conversation.name}</div>
@@ -340,7 +342,7 @@ const AdminMessages = () => {
                         <span className="workspace-pill">Conversation</span>
                       )}
                     </div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>

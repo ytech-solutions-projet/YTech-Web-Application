@@ -358,7 +358,7 @@ const Header = ({ theme = 'light', onToggleTheme = () => {} }) => {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`mobile-nav-link ${isActive(link.to) ? 'active' : ''}`}
+                  className={`mobile-nav-link ${isActive(link.matchPath || link.to.split('?')[0]) ? 'active' : ''}`}
                   onClick={closeMenus}
                 >
                   {link.label}

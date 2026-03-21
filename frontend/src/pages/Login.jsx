@@ -108,7 +108,7 @@ const Login = () => {
       }
 
       if (payload.user?.role === 'admin') {
-        navigate('/admin-messages');
+        navigate('/dashboard');
         return;
       }
 

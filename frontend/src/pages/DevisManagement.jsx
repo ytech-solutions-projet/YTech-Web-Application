@@ -51,6 +51,7 @@ const DevisManagement = () => {
   const [filter, setFilter] = useState('all');
   const [decisionNote, setDecisionNote] = useState('');
   const [paymentAmountDraft, setPaymentAmountDraft] = useState('');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isAdmin = user?.role === 'admin';
@@ -148,6 +149,7 @@ const DevisManagement = () => {
 
   const handleStatusChange = async (quote, newStatus, options = {}) => {
     try {
+      setIsUpdatingStatus(true);
       const payload = {
         decisionNote: options.decisionNote ?? decisionNote
       };
@@ -163,8 +165,12 @@ const DevisManagement = () => {
       const updatedQuote = await updateQuoteStatus(quote.id, newStatus, payload);
       setQuotes((prev) => prev.map((item) => (item.id === quote.id ? updatedQuote : item)));
       setSelectedQuote((prev) => (prev?.id === quote.id ? updatedQuote : prev));
+      return updatedQuote;
     } catch (error) {
       window.alert(error.message || 'Impossible de mettre a jour le devis.');
+      return null;
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
 
@@ -243,22 +249,30 @@ const DevisManagement = () => {
             <div className="workspace-card workspace-card--padded">
               <h2 className="workspace-section-title">Raccourcis utiles</h2>
               <div className="workspace-action-grid" style={{ marginTop: '1rem' }}>
-                <Link to="/devis" className="workspace-action-card">
-                  <span className="workspace-action-card__icon">NEW</span>
+                <Link to={isAdmin ? '/dashboard' : '/devis'} className="workspace-action-card">
+                  <span className="workspace-action-card__icon">{isAdmin ? 'ADM' : 'NEW'}</span>
                   <div>
-                    <div className="workspace-action-card__title">Nouveau devis</div>
+                    <div className="workspace-action-card__title">
+                      {isAdmin ? 'Dashboard admin' : 'Nouveau devis'}
+                    </div>
                     <div className="workspace-action-card__text">
-                      Lancer une nouvelle demande depuis le formulaire.
+                      {isAdmin
+                        ? 'Revenir au pilotage global des demandes et paiements.'
+                        : 'Lancer une nouvelle demande depuis le formulaire.'}
                     </div>
                   </div>
                 </Link>
 
-                <Link to="/messages" className="workspace-action-card">
+                <Link to={isAdmin ? '/admin-messages' : '/messages'} className="workspace-action-card">
                   <span className="workspace-action-card__icon">MSG</span>
                   <div>
-                    <div className="workspace-action-card__title">Contacter YTECH</div>
+                    <div className="workspace-action-card__title">
+                      {isAdmin ? 'Conversations' : 'Contacter YTECH'}
+                    </div>
                     <div className="workspace-action-card__text">
-                      Reprendre la conversation avec notre equipe.
+                      {isAdmin
+                        ? 'Ouvrir la messagerie admin et les demandes entrantes.'
+                        : 'Reprendre la conversation avec notre equipe.'}
                     </div>
                   </div>
                 </Link>
@@ -299,8 +313,8 @@ const DevisManagement = () => {
                     Filtrez par statut puis ouvrez un devis pour voir le detail complet.
                   </p>
                 </div>
-                <Link to="/devis" className="btn btn-primary">
-                  Nouveau devis
+                <Link to={isAdmin ? '/dashboard' : '/devis'} className="btn btn-primary">
+                  {isAdmin ? 'Retour dashboard' : 'Nouveau devis'}
                 </Link>
               </div>
 
@@ -386,6 +400,7 @@ const DevisManagement = () => {
                                 <button
                                   type="button"
                                   className="workspace-inline-btn is-success"
+                                  disabled={isUpdatingStatus}
                                   onClick={() =>
                                     handleStatusChange(quote, 'approved', {
                                       paymentAmount: getDefaultPaymentAmount(quote),
@@ -408,6 +423,7 @@ const DevisManagement = () => {
                                 <button
                                   type="button"
                                   className="workspace-inline-btn is-danger"
+                                  disabled={isUpdatingStatus}
                                   onClick={() => handleDeleteQuote(quote.id)}
                                 >
                                   Supprimer
@@ -541,22 +557,28 @@ const DevisManagement = () => {
                     <button
                       type="button"
                       className="workspace-inline-btn is-success"
-                      onClick={() => {
-                        handleStatusChange(selectedQuote, 'approved');
-                        closeQuoteDetails();
+                      disabled={isUpdatingStatus}
+                      onClick={async () => {
+                        const updatedQuote = await handleStatusChange(selectedQuote, 'approved');
+                        if (updatedQuote) {
+                          closeQuoteDetails();
+                        }
                       }}
                     >
-                      Approuver
+                      {isUpdatingStatus ? 'Mise a jour...' : 'Approuver'}
                     </button>
                     <button
                       type="button"
                       className="workspace-inline-btn is-danger"
-                      onClick={() => {
-                        handleStatusChange(selectedQuote, 'rejected');
-                        closeQuoteDetails();
+                      disabled={isUpdatingStatus}
+                      onClick={async () => {
+                        const updatedQuote = await handleStatusChange(selectedQuote, 'rejected');
+                        if (updatedQuote) {
+                          closeQuoteDetails();
+                        }
                       }}
                     >
-                      Rejeter
+                      {isUpdatingStatus ? 'Mise a jour...' : 'Rejeter'}
                     </button>
                   </>
                 )}

@@ -5,14 +5,14 @@ const Toast = ({ toast, onRemove }) => {
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
-        return '✓';
+        return 'OK';
       case 'error':
-        return '✕';
+        return 'ERR';
       case 'warning':
-        return '⚠';
+        return 'WARN';
       case 'info':
       default:
-        return 'ℹ';
+        return 'INFO';
     }
   };
 
@@ -26,8 +26,8 @@ const Toast = ({ toast, onRemove }) => {
         <div className="toast-message">{toast.message}</div>
       </div>
       {toast.duration !== 0 && (
-        <button className="toast-close" onClick={() => onRemove(toast.id)}>
-          ×
+        <button type="button" className="toast-close" onClick={() => onRemove(toast.id)}>
+          x
         </button>
       )}
     </div>
@@ -37,7 +37,7 @@ const Toast = ({ toast, onRemove }) => {
 const ToastContainer = ({ toasts, removeToast, position = 'top-right' }) => {
   return (
     <div className={`toast-container toast-${position}`}>
-      {toasts.map(toast => (
+      {toasts.map((toast) => (
         <Toast key={toast.id} toast={toast} onRemove={removeToast} />
       ))}
     </div>
