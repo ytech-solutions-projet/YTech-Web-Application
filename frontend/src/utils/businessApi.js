@@ -56,10 +56,10 @@ export const updateQuoteStatus = async (quoteId, status, options = {}) => {
   return payload.quote || null;
 };
 
-export const payQuote = async (quoteId) => {
+export const payQuote = async (quoteId, paymentDetails = {}) => {
   const payload = await requestJson(
     `/api/quotes/${encodeURIComponent(quoteId)}/pay`,
-    buildJsonOptions('POST')
+    buildJsonOptions('POST', paymentDetails)
   );
 
   return {

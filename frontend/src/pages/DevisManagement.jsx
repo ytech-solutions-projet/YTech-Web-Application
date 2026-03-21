@@ -44,6 +44,35 @@ const getProjectStepCopy = (quote) => {
   }
 };
 
+const formatTimelineImpact = (quote) =>
+  quote?.metadata?.timelineImpact || 'Aucun impact de delai renseigne';
+
+const formatFeatureCost = (quote) => {
+  if (!Number.isFinite(Number(quote?.metadata?.featureCost)) || Number(quote?.metadata?.featureCost) <= 0) {
+    return 'Aucun cout additionnel renseigne';
+  }
+
+  return `${Number(quote.metadata.featureCost).toLocaleString('fr-MA')} MAD`;
+};
+
+const formatMetaDate = (value) => (value ? formatDate(value) : 'Non specifie');
+
+const getPaymentMethodDetails = (quote) => {
+  if (!quote) {
+    return 'Non requis pour le moment';
+  }
+
+  if (quote.metadata?.paymentLabel) {
+    return quote.metadata.paymentLabel;
+  }
+
+  if (quote.status === 'approved' || quote.status === 'in_progress') {
+    return formatPaymentAmount(quote);
+  }
+
+  return 'Non requis pour le moment';
+};
+
 const DevisManagement = () => {
   const [user, setUser] = useState(null);
   const [quotes, setQuotes] = useState([]);
@@ -360,7 +389,9 @@ const DevisManagement = () => {
                         <span>{quote.metadata?.budget || 'Budget non specifie'}</span>
                         <span>{quote.metadata?.timeline || 'Delai non specifie'}</span>
                         <span>{quote.metadata?.estimatedRange || 'Estimation a definir'}</span>
-                        {quote.status === 'approved' ? <span>Paiement : {formatPaymentAmount(quote)}</span> : null}
+                        {quote.status === 'approved' || quote.status === 'in_progress' ? (
+                          <span>Paiement : {formatPaymentAmount(quote)}</span>
+                        ) : null}
                       </div>
                     </div>
 
@@ -463,93 +494,163 @@ const DevisManagement = () => {
             </div>
 
             <div className="workspace-modal__body">
-              <div className="workspace-modal__grid">
-                <div className="workspace-modal__meta">
-                  <strong>Client</strong>
-                  <span>{selectedQuote.senderName || user.name}</span>
-                </div>
-                <div className="workspace-modal__meta">
-                  <strong>Email</strong>
-                  <span>{selectedQuote.senderId || selectedQuote.email}</span>
-                </div>
-                <div className="workspace-modal__meta">
-                  <strong>Budget</strong>
-                  <span>{selectedQuote.metadata?.budget || 'Non specifie'}</span>
-                </div>
-                <div className="workspace-modal__meta">
-                  <strong>Delai</strong>
-                  <span>{selectedQuote.metadata?.timeline || 'Non specifie'}</span>
-                </div>
-                <div className="workspace-modal__meta">
-                  <strong>Estimation</strong>
-                  <span>{selectedQuote.metadata?.estimatedRange || 'A definir'}</span>
-                </div>
-                <div className="workspace-modal__meta">
-                  <strong>Statut</strong>
-                  <span>{statusLabels[selectedQuote.status] || 'Inconnu'}</span>
-                </div>
-                <div className="workspace-modal__meta">
-                  <strong>Paiement</strong>
-                  <span>
-                    {selectedQuote.status === 'approved' || selectedQuote.status === 'in_progress'
-                      ? formatPaymentAmount(selectedQuote)
-                      : 'Non requis pour le moment'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="workspace-modal__section">
-                <h3>Description du projet</h3>
-                <div className="workspace-modal__content">{selectedQuote.content}</div>
-              </div>
-
-              {selectedQuote.metadata?.decisionNote ? (
-                <div className="workspace-modal__section">
-                  <h3>Decision YTECH</h3>
-                  <div className="workspace-modal__content">{selectedQuote.metadata.decisionNote}</div>
-                </div>
-              ) : null}
-
-              {selectedQuote.metadata?.features?.length > 0 && (
-                <div className="workspace-modal__section">
-                  <h3>Fonctionnalites demandees</h3>
-                  <div className="workspace-tags">
-                    {selectedQuote.metadata.features.map((feature) => (
-                      <span key={feature} className="workspace-tag">
-                        {feature}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {isAdmin && selectedQuote.status === 'pending' && (
-                <div className="workspace-modal__section">
-                  <h3>Validation admin</h3>
-                  <div className="workspace-modal__grid">
-                    <div className="workspace-modal__meta">
-                      <strong>Montant a payer</strong>
-                      <input
-                        className="workspace-input"
-                        type="number"
-                        min="0"
-                        step="100"
-                        value={paymentAmountDraft}
-                        onChange={(event) => setPaymentAmountDraft(event.target.value)}
-                        placeholder={`${getDefaultPaymentAmount(selectedQuote) || ''}`}
-                      />
+              <div className="workspace-modal__layout">
+                <div className="workspace-modal__main">
+                  <div className="workspace-modal__section">
+                    <h3>Description du projet</h3>
+                    <div className="workspace-modal__content">
+                      {selectedQuote.projectDescription || selectedQuote.content || 'Aucune description detaillee.'}
                     </div>
                   </div>
-                  <textarea
-                    className="workspace-input"
-                    rows="4"
-                    value={decisionNote}
-                    onChange={(event) => setDecisionNote(event.target.value)}
-                    placeholder="Ajoutez une note pour le client avant l envoi automatique du message."
-                    style={{ marginTop: '1rem', resize: 'vertical' }}
-                  />
+
+                  {selectedQuote.content && selectedQuote.content !== selectedQuote.projectDescription ? (
+                    <div className="workspace-modal__section">
+                      <h3>Recapitulatif envoye</h3>
+                      <div className="workspace-modal__content">{selectedQuote.content}</div>
+                    </div>
+                  ) : null}
+
+                  <div className="workspace-modal__section">
+                    <h3>Cadrage du devis</h3>
+                    <div className="workspace-modal__grid workspace-modal__grid--wide">
+                      <div className="workspace-modal__meta">
+                        <strong>Service</strong>
+                        <span>{selectedQuote.metadata?.service || 'Non specifie'}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Budget</strong>
+                        <span>{selectedQuote.metadata?.budget || 'Non specifie'}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Delai</strong>
+                        <span>{selectedQuote.metadata?.timeline || 'Non specifie'}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Estimation</strong>
+                        <span>{selectedQuote.metadata?.estimatedRange || 'A definir'}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Impact delai</strong>
+                        <span>{formatTimelineImpact(selectedQuote)}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Options additionnelles</strong>
+                        <span>{formatFeatureCost(selectedQuote)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedQuote.metadata?.features?.length > 0 && (
+                    <div className="workspace-modal__section">
+                      <h3>Fonctionnalites demandees</h3>
+                      <div className="workspace-tags">
+                        {selectedQuote.metadata.features.map((feature) => (
+                          <span key={feature} className="workspace-tag">
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedQuote.metadata?.decisionNote ? (
+                    <div className="workspace-modal__section">
+                      <h3>Decision YTECH</h3>
+                      <div className="workspace-modal__content">{selectedQuote.metadata.decisionNote}</div>
+                    </div>
+                  ) : null}
+
+                  {isAdmin && selectedQuote.status === 'pending' && (
+                    <div className="workspace-modal__section">
+                      <h3>Validation admin</h3>
+                      <div className="workspace-modal__grid">
+                        <div className="workspace-modal__meta">
+                          <strong>Montant a payer</strong>
+                          <input
+                            className="workspace-input"
+                            type="number"
+                            min="0"
+                            step="100"
+                            value={paymentAmountDraft}
+                            onChange={(event) => setPaymentAmountDraft(event.target.value)}
+                            placeholder={`${getDefaultPaymentAmount(selectedQuote) || ''}`}
+                          />
+                        </div>
+                      </div>
+                      <textarea
+                        className="workspace-input"
+                        rows="4"
+                        value={decisionNote}
+                        onChange={(event) => setDecisionNote(event.target.value)}
+                        placeholder="Ajoutez une note pour le client avant l envoi automatique du message."
+                        style={{ marginTop: '1rem', resize: 'vertical' }}
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
+
+                <aside className="workspace-modal__aside">
+                  <div className="workspace-modal__panel">
+                    <h3>Coordonnees</h3>
+                    <div className="workspace-modal__stack">
+                      <div className="workspace-modal__meta">
+                        <strong>Client</strong>
+                        <span>{selectedQuote.senderName || user.name}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Email</strong>
+                        <span>{selectedQuote.senderId || selectedQuote.email}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Telephone</strong>
+                        <span>{selectedQuote.phone || 'Non specifie'}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Entreprise</strong>
+                        <span>{selectedQuote.company || 'Non specifiee'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="workspace-modal__panel">
+                    <h3>Suivi du dossier</h3>
+                    <div className="workspace-modal__stack">
+                      <div className="workspace-modal__meta">
+                        <strong>Reference</strong>
+                        <span>{selectedQuote.id}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Statut</strong>
+                        <span>{statusLabels[selectedQuote.status] || 'Inconnu'}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Paiement</strong>
+                        <span>{getPaymentMethodDetails(selectedQuote)}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Montant</strong>
+                        <span>{formatPaymentAmount(selectedQuote)}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Demande creee le</strong>
+                        <span>{formatMetaDate(selectedQuote.timestamp)}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Decision prise le</strong>
+                        <span>{formatMetaDate(selectedQuote.metadata?.decidedAt)}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Paiement confirme le</strong>
+                        <span>{formatMetaDate(selectedQuote.metadata?.paymentPaidAt)}</span>
+                      </div>
+                      <div className="workspace-modal__meta">
+                        <strong>Email de paiement</strong>
+                        <span>{selectedQuote.metadata?.paymentPayerEmail || 'Non renseigne'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+              </div>
 
               <div className="workspace-modal__footer">
                 {isAdmin && selectedQuote.status === 'pending' && (

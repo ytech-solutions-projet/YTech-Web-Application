@@ -2,7 +2,21 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PublicHero from '../components/PublicHero';
 import SiteFooter from '../components/SiteFooter';
-import { listQuotes, payQuote } from '../utils/businessApi';
+import { payQuote, listQuotes } from '../utils/businessApi';
+import { readAuthUser, readJsonStorage, writeJsonStorage } from '../utils/storage';
+import {
+  detectCardBrand,
+  formatCardNumber,
+  formatExpiry,
+  getCardDigits,
+  getLastFourDigits,
+  getPaymentMethodLabel,
+  isValidCardholderName,
+  isValidCardNumber,
+  isValidCvc,
+  isValidExpiry
+} from '../utils/payment';
+import './PaymentPage.css';
 
 const plans = [
   {
@@ -60,6 +74,17 @@ const formatMoney = (amount, currency = 'MAD') => {
   return `${Number(amount).toLocaleString('fr-MA')} ${currency}`;
 };
 
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(`${value ?? ''}`.trim());
+
+const buildInitialPaymentForm = (user) => ({
+  cardholderName: user?.name || '',
+  cardNumber: '',
+  expiry: '',
+  cvc: '',
+  paypalEmail: user?.email || '',
+  agreementAccepted: false
+});
+
 const PaymentPage = () => {
   const [user, setUser] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -69,6 +94,10 @@ const PaymentPage = () => {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [pageError, setPageError] = useState('');
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [paymentForm, setPaymentForm] = useState(buildInitialPaymentForm(null));
+  const [fieldErrors, setFieldErrors] = useState({});
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const quoteId = searchParams.get('quoteId');
@@ -77,17 +106,16 @@ const PaymentPage = () => {
     let isMounted = true;
 
     const loadPaymentContext = async () => {
-      const isLoggedIn = localStorage.getItem('isLoggedIn');
-      const userData = localStorage.getItem('user');
+      const authUser = readAuthUser();
 
-      if (!isLoggedIn || !userData) {
+      if (!authUser) {
         navigate('/login');
         return;
       }
 
-      const parsedUser = JSON.parse(userData);
       if (isMounted) {
-        setUser(parsedUser);
+        setUser(authUser);
+        setPaymentForm(buildInitialPaymentForm(authUser));
       }
 
       if (!quoteId) {
@@ -143,14 +171,150 @@ const PaymentPage = () => {
   }, [linkedQuote]);
 
   const quoteCurrency = linkedQuote?.metadata?.paymentCurrency || 'MAD';
+  const cardBrand = detectCardBrand(paymentForm.cardNumber);
   const canPayQuote = linkedQuote?.status === 'approved';
   const isQuoteAlreadyPaid = linkedQuote?.status === 'in_progress';
   const isQuotePaymentLocked = Boolean(linkedQuote) && !canPayQuote && !isQuoteAlreadyPaid;
 
+  const checkoutContext = useMemo(() => {
+    if (linkedQuote) {
+      return {
+        kind: 'quote',
+        title: linkedQuote.metadata?.service || 'Projet YTECH',
+        subtitle: linkedQuote.metadata?.timeline || 'Delai a definir',
+        amount: quoteAmount,
+        currency: quoteCurrency,
+        summary: [
+          { label: 'Reference', value: linkedQuote.id },
+          { label: 'Estimation', value: linkedQuote.metadata?.estimatedRange || 'A definir' },
+          { label: 'Statut', value: linkedQuote.status === 'approved' ? 'Paiement attendu' : 'Projet en cours' }
+        ]
+      };
+    }
+
+    if (!selectedPlan) {
+      return null;
+    }
+
+    return {
+      kind: 'plan',
+      title: selectedPlan.name,
+      subtitle: selectedPlan.duration,
+      amount: selectedPlan.price,
+      currency: selectedPlan.currency,
+      summary: [
+        { label: 'Plan', value: selectedPlan.name },
+        { label: 'Duree estimee', value: selectedPlan.duration },
+        { label: 'Client', value: user?.name || 'Client YTECH' }
+      ]
+    };
+  }, [linkedQuote, quoteAmount, quoteCurrency, selectedPlan, user?.name]);
+
   const persistTransaction = (nextTransaction) => {
-    const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
-    transactions.push(nextTransaction);
-    localStorage.setItem('transactions', JSON.stringify(transactions));
+    const transactions = readJsonStorage('transactions', []);
+    writeJsonStorage('transactions', [...transactions, nextTransaction]);
+  };
+
+  const updateField = (field, value) => {
+    setPaymentError('');
+    setFieldErrors((prev) => ({ ...prev, [field]: '' }));
+    setPaymentForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCardNumberChange = (value) => {
+    updateField('cardNumber', formatCardNumber(value));
+  };
+
+  const handleExpiryChange = (value) => {
+    updateField('expiry', formatExpiry(value));
+  };
+
+  const handleCvcChange = (value) => {
+    updateField('cvc', `${value ?? ''}`.replace(/\D/g, '').slice(0, 4));
+  };
+
+  const handleMethodChange = (method) => {
+    setPaymentMethod(method);
+    setPaymentError('');
+    setFieldErrors({});
+  };
+
+  const validatePaymentForm = () => {
+    const nextErrors = {};
+
+    if (!paymentForm.agreementAccepted) {
+      nextErrors.agreementAccepted =
+        'Confirmez les conditions de paiement avant de lancer la transaction.';
+    }
+
+    if (paymentMethod === 'paypal') {
+      if (!isValidEmail(paymentForm.paypalEmail)) {
+        nextErrors.paypalEmail = 'Renseignez une adresse PayPal valide.';
+      }
+
+      return nextErrors;
+    }
+
+    if (!isValidCardholderName(paymentForm.cardholderName)) {
+      nextErrors.cardholderName = 'Le nom du titulaire doit etre complet.';
+    }
+
+    if (!isValidCardNumber(paymentForm.cardNumber)) {
+      nextErrors.cardNumber = 'Le numero de carte est invalide.';
+    }
+
+    if (!isValidExpiry(paymentForm.expiry)) {
+      nextErrors.expiry = 'La date d expiration est invalide.';
+    }
+
+    if (!isValidCvc(paymentForm.cvc, cardBrand)) {
+      nextErrors.cvc =
+        cardBrand === 'American Express'
+          ? 'Le code de securite doit contenir 4 chiffres.'
+          : 'Le code de securite doit contenir 3 chiffres.';
+    }
+
+    return nextErrors;
+  };
+
+  const buildPaymentRequest = () => {
+    if (paymentMethod === 'paypal') {
+      const paypalEmail = paymentForm.paypalEmail.trim().toLowerCase();
+
+      return {
+        apiPayload: {
+          method: 'paypal',
+          payerEmail: paypalEmail,
+          payerName: user?.name || ''
+        },
+        method: 'paypal',
+        paymentLabel: getPaymentMethodLabel('paypal', { paypalEmail }),
+        paymentEmail: paypalEmail,
+        cardBrand: '',
+        cardLast4: ''
+      };
+    }
+
+    const cleanCardNumber = getCardDigits(paymentForm.cardNumber);
+
+    return {
+      apiPayload: {
+        method: 'card',
+        cardholderName: paymentForm.cardholderName.trim(),
+        cardNumber: cleanCardNumber,
+        expiry: paymentForm.expiry,
+        cvc: paymentForm.cvc,
+        payerEmail: user?.email || ''
+      },
+      method: 'card',
+      paymentLabel: getPaymentMethodLabel('card', {
+        brand: cardBrand,
+        cardNumber: cleanCardNumber
+      }),
+      paymentEmail: user?.email || '',
+      cardBrand,
+      cardLast4: getLastFourDigits(cleanCardNumber)
+    };
   };
 
   const handlePayment = async () => {
@@ -158,11 +322,30 @@ const PaymentPage = () => {
       return;
     }
 
+    if (!linkedQuote && !selectedPlan) {
+      setPaymentError('Choisissez un plan avant de lancer le paiement.');
+      return;
+    }
+
+    const nextErrors = validatePaymentForm();
+    setFieldErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    const paymentRequest = buildPaymentRequest();
+    const requestPayload = {
+      ...paymentRequest.apiPayload,
+      agreementAccepted: paymentForm.agreementAccepted
+    };
+
     setIsProcessing(true);
+    setPaymentError('');
 
     try {
       if (linkedQuote) {
-        const result = await payQuote(linkedQuote.id);
+        const result = await payQuote(linkedQuote.id, requestPayload);
         const nextTransaction = {
           id: result.transaction?.id || `pay_${Date.now()}`,
           quoteId: linkedQuote.id,
@@ -172,6 +355,12 @@ const PaymentPage = () => {
           service: linkedQuote.metadata?.service || 'Projet YTECH',
           amount: result.transaction?.amount ?? quoteAmount ?? 0,
           currency: result.transaction?.currency || quoteCurrency,
+          paymentMethod: result.transaction?.paymentMethod || paymentRequest.method,
+          paymentProvider: result.transaction?.paymentProvider || paymentRequest.method,
+          paymentLabel: result.transaction?.paymentLabel || paymentRequest.paymentLabel,
+          paymentEmail: result.transaction?.paymentEmail || paymentRequest.paymentEmail,
+          cardBrand: result.transaction?.cardBrand || paymentRequest.cardBrand,
+          cardLast4: result.transaction?.cardLast4 || paymentRequest.cardLast4,
           status: result.transaction?.status || 'completed',
           timestamp: result.transaction?.timestamp || new Date().toISOString()
         };
@@ -183,20 +372,22 @@ const PaymentPage = () => {
         return;
       }
 
-      if (!selectedPlan) {
-        return;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 2200));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const nextTransaction = {
-        id: Date.now(),
+        id: `${paymentMethod === 'paypal' ? 'pp' : 'cb'}_${Date.now()}`,
         userId: user.email,
         planId: selectedPlan.id,
         planName: selectedPlan.name,
         service: selectedPlan.name,
         amount: selectedPlan.price,
         currency: selectedPlan.currency,
+        paymentMethod: paymentRequest.method,
+        paymentProvider: paymentRequest.method,
+        paymentLabel: paymentRequest.paymentLabel,
+        paymentEmail: paymentRequest.paymentEmail,
+        cardBrand: paymentRequest.cardBrand,
+        cardLast4: paymentRequest.cardLast4,
         status: 'completed',
         timestamp: new Date().toISOString()
       };
@@ -205,7 +396,7 @@ const PaymentPage = () => {
       setTransaction(nextTransaction);
       setPaymentSuccess(true);
     } catch (error) {
-      setPageError(error.message || 'Impossible de finaliser ce paiement pour le moment.');
+      setPaymentError(error.message || 'Impossible de finaliser ce paiement pour le moment.');
     } finally {
       setIsProcessing(false);
     }
@@ -231,8 +422,9 @@ const PaymentPage = () => {
               <h1 className="success-card__title">Paiement confirme.</h1>
               <p className="success-card__text">
                 Votre paiement de {formatMoney(transaction.amount, transaction.currency)} a bien ete
-                enregistre pour {transaction.service || transaction.planName}. Le projet passe
-                maintenant a l etape suivante.
+                enregistre pour {transaction.service || transaction.planName}. Moyen confirme :
+                {' '}
+                {transaction.paymentLabel || 'Paiement securise'}.
               </p>
               <div className="success-card__actions">
                 <Link to="/dashboard" className="marketing-button marketing-button--dark">
@@ -349,12 +541,12 @@ const PaymentPage = () => {
         title={
           linkedQuote
             ? 'Votre devis a ete valide. Vous pouvez maintenant lancer le projet.'
-            : 'Choisissez un cadre de production puis lancez la suite.'
+            : 'Choisissez une enveloppe puis payez par carte ou via PayPal.'
         }
         description={
           linkedQuote
-            ? 'Le paiement de lancement relie directement le devis accepte au demarrage reel du projet, avec mise a jour automatique du dashboard.'
-            : 'Les trois plans servent surtout de point de depart pour cadrer l enveloppe, la complexite et le rythme de livraison.'
+            ? 'Le paiement de lancement relie directement le devis accepte au demarrage reel du projet, avec validation du moyen choisi avant confirmation.'
+            : 'Vous pouvez maintenant choisir votre plan, regler par carte bancaire ou via PayPal et recevoir un recapitulatif plus propre.'
         }
         actions={[
           linkedQuote
@@ -364,8 +556,8 @@ const PaymentPage = () => {
         ]}
         highlights={
           linkedQuote
-            ? ['Devis accepte', 'Paiement de lancement', 'Passage auto en production']
-            : ['Paiement securise', 'Plans lisibles', 'Lancement rapide']
+            ? ['Carte bancaire validee', 'PayPal disponible', 'Passage auto en production']
+            : ['Carte + PayPal', 'Controle des numeros', 'Recu enregistre']
         }
         aside={
           <>
@@ -375,170 +567,284 @@ const PaymentPage = () => {
             </h2>
             <p className="hero-panel__text">
               {linkedQuote
-                ? 'Le paiement de cette etape met le devis dans un etat "en cours" et previens l equipe en temps reel.'
-                : 'Votre selection sera reliee a votre compte pour que l equipe puisse organiser le demarrage du projet dans la foulee.'}
+                ? 'La carte est verifiee avant envoi et PayPal reste disponible si vous preferez regler avec votre compte.'
+                : 'Le paiement est plus propre: choix du moyen de paiement, verification des champs et recu plus detaille.'}
             </p>
             <ul className="hero-panel__list">
-              <li>Email : {user.email}</li>
-              <li>Mode : carte bancaire securisee</li>
-              <li>
-                Suite :{' '}
-                {linkedQuote ? 'dashboard mis a jour + notification equipe' : 'confirmation + recu + prise de contact'}
-              </li>
+              <li>Email de recu : {user.email}</li>
+              <li>Moyens : carte bancaire ou PayPal</li>
+              <li>Controle carte : longueur, reseau, date et algorithme Luhn</li>
             </ul>
           </>
         }
       />
 
-      {linkedQuote ? (
-        <section className="marketing-section marketing-section--muted">
+      {!linkedQuote ? (
+        <section className="marketing-section">
           <div className="container">
-            <div className="receipt-card marketing-shell-narrow">
-              <h2 className="receipt-card__title">Recapitulatif du devis accepte</h2>
-              <ul className="receipt-list">
-                <li>
-                  <span>Service</span>
-                  <strong>{linkedQuote.metadata?.service || 'Projet YTECH'}</strong>
-                </li>
-                <li>
-                  <span>Delai</span>
-                  <strong>{linkedQuote.metadata?.timeline || 'A definir'}</strong>
-                </li>
-                <li>
-                  <span>Estimation</span>
-                  <strong>{linkedQuote.metadata?.estimatedRange || 'A definir'}</strong>
-                </li>
-                <li>
-                  <span>Etat actuel</span>
-                  <strong>{linkedQuote.status === 'approved' ? 'Paiement attendu' : 'Projet en cours'}</strong>
-                </li>
-              </ul>
+            <div className="section-heading">
+              <span className="section-heading__eyebrow">Plans</span>
+              <h2 className="section-heading__title">
+                Choisissez d abord l enveloppe qui correspond au projet.
+              </h2>
+            </div>
 
-              <div className="receipt-card__amount">{formatMoney(quoteAmount, quoteCurrency)}</div>
+            <div className="pricing-grid">
+              {plans.map((plan) => {
+                const isSelected = selectedPlan?.id === plan.id;
+                const cardClasses = [
+                  'pricing-card',
+                  isSelected ? 'is-selected' : '',
+                  plan.id === 'professional' ? 'is-featured' : ''
+                ]
+                  .filter(Boolean)
+                  .join(' ');
 
-              {linkedQuote.metadata?.decisionNote ? (
-                <p className="marketing-note">Note YTECH : {linkedQuote.metadata.decisionNote}</p>
-              ) : null}
-
-              <div className="success-card__actions marketing-mt-md">
-                <button
-                  type="button"
-                  className="marketing-button marketing-button--dark"
-                  onClick={handlePayment}
-                  disabled={isProcessing || !canPayQuote}
-                >
-                  {isProcessing
-                    ? 'Traitement du paiement...'
-                    : `Payer ${formatMoney(quoteAmount, quoteCurrency)}`}
-                </button>
-                <Link to="/devis-management" className="marketing-button marketing-button--accent">
-                  Retour au suivi
-                </Link>
-              </div>
+                return (
+                  <article
+                    key={plan.id}
+                    className={cardClasses}
+                    onClick={() => setSelectedPlan(plan)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedPlan(plan);
+                      }
+                    }}
+                  >
+                    <span className="panel-card__eyebrow">{plan.duration}</span>
+                    <h3 className="panel-card__title">{plan.name}</h3>
+                    <div className="pricing-price">
+                      {plan.price.toLocaleString('fr-MA')} {plan.currency}
+                    </div>
+                    <ul className="pricing-list">
+                      {plan.features.map((feature) => (
+                        <li key={feature}>{feature}</li>
+                      ))}
+                    </ul>
+                  </article>
+                );
+              })}
             </div>
           </div>
         </section>
-      ) : (
-        <>
-          <section className="marketing-section">
-            <div className="container">
-              <div className="section-heading">
-                <span className="section-heading__eyebrow">Plans</span>
-                <h2 className="section-heading__title">
-                  Une lecture plus nette des enveloppes et de ce qu elles couvrent.
-                </h2>
-              </div>
+      ) : null}
 
-              <div className="pricing-grid">
-                {plans.map((plan) => {
-                  const isSelected = selectedPlan?.id === plan.id;
-                  const cardClasses = [
-                    'pricing-card',
-                    isSelected ? 'is-selected' : '',
-                    plan.id === 'professional' ? 'is-featured' : ''
-                  ]
-                    .filter(Boolean)
-                    .join(' ');
+      {checkoutContext ? (
+        <section className="marketing-section marketing-section--muted">
+          <div className="container">
+            <div className="payment-checkout">
+              <article className="receipt-card payment-checkout__summary">
+                <span className="payment-section-label">Recapitulatif</span>
+                <h2 className="receipt-card__title">{checkoutContext.title}</h2>
+                <p className="payment-checkout__subtitle">{checkoutContext.subtitle}</p>
+                <ul className="receipt-list">
+                  {checkoutContext.summary.map((item) => (
+                    <li key={item.label}>
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                    </li>
+                  ))}
+                  <li>
+                    <span>Email de recu</span>
+                    <strong>{user.email}</strong>
+                  </li>
+                </ul>
 
-                  return (
-                    <article
-                      key={plan.id}
-                      className={cardClasses}
-                      onClick={() => setSelectedPlan(plan)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          setSelectedPlan(plan);
-                        }
-                      }}
-                    >
-                      <span className="panel-card__eyebrow">{plan.duration}</span>
-                      <h3 className="panel-card__title">{plan.name}</h3>
-                      <div className="pricing-price">
-                        {plan.price.toLocaleString()} {plan.currency}
-                      </div>
-                      <ul className="pricing-list">
-                        {plan.features.map((feature) => (
-                          <li key={feature}>{feature}</li>
-                        ))}
-                      </ul>
-                    </article>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
+                <div className="receipt-card__amount">
+                  {formatMoney(checkoutContext.amount, checkoutContext.currency)}
+                </div>
 
-          {selectedPlan ? (
-            <section className="marketing-section marketing-section--muted">
-              <div className="container">
-                <div className="receipt-card marketing-shell-narrow">
-                  <h2 className="receipt-card__title">Recapitulatif avant paiement</h2>
-                  <ul className="receipt-list">
-                    <li>
-                      <span>Plan</span>
-                      <strong>{selectedPlan.name}</strong>
-                    </li>
-                    <li>
-                      <span>Duree estimee</span>
-                      <strong>{selectedPlan.duration}</strong>
-                    </li>
-                    <li>
-                      <span>Client</span>
-                      <strong>{user.name}</strong>
-                    </li>
-                    <li>
-                      <span>Email</span>
-                      <strong>{user.email}</strong>
-                    </li>
-                  </ul>
+                {linkedQuote?.metadata?.decisionNote ? (
+                  <p className="marketing-note">Note YTECH : {linkedQuote.metadata.decisionNote}</p>
+                ) : (
+                  <p className="marketing-note">
+                    Le paiement enregistre votre moyen choisi et declenche le passage a l etape suivante.
+                  </p>
+                )}
+              </article>
 
-                  <div className="receipt-card__amount">
-                    {selectedPlan.price.toLocaleString()} {selectedPlan.currency}
+              <article className="payment-panel">
+                <div className="payment-panel__head">
+                  <div>
+                    <span className="payment-section-label">Moyen de paiement</span>
+                    <h2 className="payment-panel__title">Carte bancaire ou PayPal</h2>
+                  </div>
+                  <div className="payment-security-badge">Verification active</div>
+                </div>
+
+                <div className="payment-method-switch" role="tablist" aria-label="Choix du mode de paiement">
+                  <button
+                    type="button"
+                    className={`payment-method-switch__btn ${paymentMethod === 'card' ? 'is-active' : ''}`}
+                    onClick={() => handleMethodChange('card')}
+                    aria-selected={paymentMethod === 'card'}
+                  >
+                    Carte bancaire
+                  </button>
+                  <button
+                    type="button"
+                    className={`payment-method-switch__btn ${paymentMethod === 'paypal' ? 'is-active' : ''}`}
+                    onClick={() => handleMethodChange('paypal')}
+                    aria-selected={paymentMethod === 'paypal'}
+                  >
+                    PayPal
+                  </button>
+                </div>
+
+                {paymentMethod === 'card' ? (
+                  <div className="payment-form-grid">
+                    <label className="payment-field">
+                      <span>Titulaire de la carte</span>
+                      <input
+                        type="text"
+                        className={`payment-input ${fieldErrors.cardholderName ? 'is-error' : ''}`}
+                        value={paymentForm.cardholderName}
+                        onChange={(event) => updateField('cardholderName', event.target.value)}
+                        placeholder="Nom comme sur la carte"
+                        autoComplete="cc-name"
+                      />
+                      {fieldErrors.cardholderName ? (
+                        <small className="payment-field__error">{fieldErrors.cardholderName}</small>
+                      ) : null}
+                    </label>
+
+                    <label className="payment-field payment-field--full">
+                      <span>Numero de carte</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className={`payment-input ${fieldErrors.cardNumber ? 'is-error' : ''}`}
+                        value={paymentForm.cardNumber}
+                        onChange={(event) => handleCardNumberChange(event.target.value)}
+                        placeholder="4242 4242 4242 4242"
+                        autoComplete="cc-number"
+                      />
+                      <small className="payment-field__hint">
+                        {cardBrand
+                          ? `Reseau detecte : ${cardBrand}. Les numeros invalides sont refuses.`
+                          : 'Le numero est controle automatiquement pour eviter les cartes invalides.'}
+                      </small>
+                      {fieldErrors.cardNumber ? (
+                        <small className="payment-field__error">{fieldErrors.cardNumber}</small>
+                      ) : null}
+                    </label>
+
+                    <label className="payment-field">
+                      <span>Expiration</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className={`payment-input ${fieldErrors.expiry ? 'is-error' : ''}`}
+                        value={paymentForm.expiry}
+                        onChange={(event) => handleExpiryChange(event.target.value)}
+                        placeholder="MM/AA"
+                        autoComplete="cc-exp"
+                      />
+                      {fieldErrors.expiry ? (
+                        <small className="payment-field__error">{fieldErrors.expiry}</small>
+                      ) : null}
+                    </label>
+
+                    <label className="payment-field">
+                      <span>CVC</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className={`payment-input ${fieldErrors.cvc ? 'is-error' : ''}`}
+                        value={paymentForm.cvc}
+                        onChange={(event) => handleCvcChange(event.target.value)}
+                        placeholder={cardBrand === 'American Express' ? '1234' : '123'}
+                        autoComplete="cc-csc"
+                      />
+                      {fieldErrors.cvc ? (
+                        <small className="payment-field__error">{fieldErrors.cvc}</small>
+                      ) : null}
+                    </label>
+                  </div>
+                ) : (
+                  <div className="payment-paypal-card">
+                    <div className="payment-paypal-card__icon">PP</div>
+                    <div>
+                      <h3>Paiement via PayPal</h3>
+                      <p>
+                        Utilisez votre email PayPal pour enregistrer le paiement et recevoir le recu sur la bonne adresse.
+                      </p>
+                    </div>
+
+                    <label className="payment-field payment-field--full">
+                      <span>Email PayPal</span>
+                      <input
+                        type="email"
+                        className={`payment-input ${fieldErrors.paypalEmail ? 'is-error' : ''}`}
+                        value={paymentForm.paypalEmail}
+                        onChange={(event) => updateField('paypalEmail', event.target.value)}
+                        placeholder="paypal@email.com"
+                        autoComplete="email"
+                      />
+                      {fieldErrors.paypalEmail ? (
+                        <small className="payment-field__error">{fieldErrors.paypalEmail}</small>
+                      ) : (
+                        <small className="payment-field__hint">
+                          Nous utilisons cette adresse pour tracer le paiement et le recu.
+                        </small>
+                      )}
+                    </label>
+                  </div>
+                )}
+
+                <label className={`payment-consent ${fieldErrors.agreementAccepted ? 'is-error' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={paymentForm.agreementAccepted}
+                    onChange={(event) => updateField('agreementAccepted', event.target.checked)}
+                  />
+                  <span>
+                    Je confirme le montant, le moyen de paiement choisi et j accepte l enregistrement du recu.
+                  </span>
+                </label>
+                {fieldErrors.agreementAccepted ? (
+                  <div className="payment-field__error">{fieldErrors.agreementAccepted}</div>
+                ) : null}
+
+                {paymentError ? <div className="marketing-alert payment-alert">{paymentError}</div> : null}
+
+                <div className="payment-panel__footer">
+                  <div className="payment-panel__meta">
+                    <strong>{formatMoney(checkoutContext.amount, checkoutContext.currency)}</strong>
+                    <span>
+                      {paymentMethod === 'card'
+                        ? 'Carte verifiee avant confirmation'
+                        : 'PayPal confirme avec votre email'}
+                    </span>
                   </div>
 
-                  <div className="success-card__actions marketing-mt-md">
+                  <div className="success-card__actions">
                     <button
                       type="button"
                       className="marketing-button marketing-button--dark"
                       onClick={handlePayment}
-                      disabled={isProcessing}
+                      disabled={isProcessing || (linkedQuote ? !canPayQuote : !selectedPlan)}
                     >
-                      {isProcessing
-                        ? 'Traitement du paiement...'
-                        : `Payer ${selectedPlan.price.toLocaleString()} ${selectedPlan.currency}`}
+                      {isProcessing ? 'Traitement du paiement...' : `Payer ${formatMoney(checkoutContext.amount, checkoutContext.currency)}`}
                     </button>
+                    <Link
+                      to={linkedQuote ? '/devis-management' : '/services'}
+                      className="marketing-button marketing-button--accent"
+                    >
+                      {linkedQuote ? 'Retour au suivi' : 'Revoir les offres'}
+                    </Link>
                   </div>
                 </div>
-              </div>
-            </section>
-          ) : null}
-        </>
-      )}
+              </article>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
-      <SiteFooter note="La page paiement peut maintenant servir soit a un devis accepte, soit a un paiement libre plus simple." />
+      <SiteFooter note="La page paiement gere maintenant la carte bancaire et PayPal, avec validation plus serieuse avant confirmation." />
     </div>
   );
 };

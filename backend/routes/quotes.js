@@ -5,6 +5,7 @@ const Message = require('../models/Message');
 const Quote = require('../models/Quote');
 const User = require('../models/User');
 const { authenticateRequest, maybeAuthenticateRequest, requireAdmin } = require('../middleware/auth');
+const { buildStoredPaymentMetadata, normalizePaymentPayload, validatePaymentPayload } = require('../utils/payment');
 const { normalizeEmail, normalizeText, parseInteger } = require('../utils/security');
 const { isValidPhone, normalizePhone } = require('../utils/phone');
 
@@ -150,6 +151,9 @@ const buildDecisionMessage = (quote, status) => {
   const service = quote.metadata?.service || 'votre projet';
   const decisionNote = quote.metadata?.decisionNote ? `\n\nNote YTECH :\n${quote.metadata.decisionNote}` : '';
   const paymentAmount = formatMoney(quote.metadata?.paymentAmount, quote.metadata?.paymentCurrency || 'MAD');
+  const paymentLabel = quote.metadata?.paymentLabel
+    ? `\nMoyen confirme : ${quote.metadata.paymentLabel}`
+    : '';
   const estimate = quote.metadata?.estimatedRange ? `\nEstimation retenue : ${quote.metadata.estimatedRange}` : '';
 
   if (status === 'approved') {
@@ -186,6 +190,7 @@ const buildDecisionMessage = (quote, status) => {
     `Bonjour ${quote.senderName || 'client'},`,
     '',
     `Le projet ${service} est maintenant passe en production chez YTECH.`,
+    paymentLabel,
     'Vous pourrez suivre la suite du projet depuis votre dashboard et votre messagerie.'
   ].join('\n');
 };
@@ -235,6 +240,7 @@ const notifyPaymentToAdmin = async (quote, payer) => {
       quote.metadata?.paymentAmount
         ? `Montant valide : ${formatMoney(quote.metadata.paymentAmount, quote.metadata.paymentCurrency || 'MAD')}.`
         : '',
+      quote.metadata?.paymentLabel ? `Mode de paiement : ${quote.metadata.paymentLabel}.` : '',
       'Le projet peut maintenant etre traite comme actif.'
     ]
       .filter(Boolean)
@@ -367,12 +373,24 @@ router.post('/:id/pay', authenticateRequest, async (req, res) => {
       accessibleQuote.metadata?.estimatedMin ??
       accessibleQuote.metadata?.estimatedMax ??
       null;
+    const normalizedPayment = normalizePaymentPayload(req.body, req.user.details.email);
+    const paymentValidationError = validatePaymentPayload(normalizedPayment);
+
+    if (paymentValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: paymentValidationError
+      });
+    }
+
+    const storedPaymentMetadata = buildStoredPaymentMetadata(normalizedPayment, req.user.details.email);
 
     const quote = await Quote.registerPayment(quoteId, {
       paymentAmount,
       paymentCurrency: accessibleQuote.metadata?.paymentCurrency || 'MAD',
-      paymentTransactionId: `pay_${Date.now()}`,
-      decidedBy: accessibleQuote.metadata?.decidedBy || 'admin@ytech.ma'
+      paymentTransactionId: `${normalizedPayment.method === 'paypal' ? 'pp' : 'cb'}_${Date.now()}`,
+      decidedBy: accessibleQuote.metadata?.decidedBy || 'admin@ytech.ma',
+      ...storedPaymentMetadata
     });
 
     if (quote) {
@@ -390,6 +408,12 @@ router.post('/:id/pay', authenticateRequest, async (req, res) => {
         amount: quote?.metadata?.paymentAmount ?? paymentAmount,
         currency: quote?.metadata?.paymentCurrency || 'MAD',
         service: quote?.metadata?.service || accessibleQuote.metadata?.service || 'Projet YTECH',
+        paymentMethod: quote?.metadata?.paymentMethod || normalizedPayment.method,
+        paymentProvider: quote?.metadata?.paymentProvider || storedPaymentMetadata.paymentProvider,
+        paymentLabel: quote?.metadata?.paymentLabel || storedPaymentMetadata.paymentLabel,
+        cardBrand: quote?.metadata?.paymentCardBrand || storedPaymentMetadata.paymentCardBrand,
+        cardLast4: quote?.metadata?.paymentLast4 || storedPaymentMetadata.paymentLast4,
+        paymentEmail: quote?.metadata?.paymentPayerEmail || storedPaymentMetadata.paymentPayerEmail,
         status: 'completed',
         timestamp: quote?.metadata?.paymentPaidAt || new Date().toISOString()
       }

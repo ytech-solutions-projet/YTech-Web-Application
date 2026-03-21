@@ -66,6 +66,8 @@ const PaymentSuccessPage = () => {
       `Projet : ${transaction?.service || transaction?.planName || 'N/A'}`,
       `Reference devis : ${transaction?.quoteId || 'N/A'}`,
       `Montant : ${transaction?.amount || '0'} ${transaction?.currency || 'MAD'}`,
+      `Moyen : ${transaction?.paymentLabel || 'Paiement securise'}`,
+      `Email de recu : ${transaction?.paymentEmail || user?.email || 'N/A'}`,
       `Statut : ${transaction?.status || 'completed'}`,
       '',
       'Merci pour votre confiance dans YTECH.',
@@ -110,6 +112,7 @@ const PaymentSuccessPage = () => {
               <li>Projet : {transaction?.service || transaction?.planName || 'N/A'}</li>
               <li>Date : {formatDate(transaction?.timestamp || new Date().toISOString())}</li>
               <li>Montant : {transaction?.amount?.toLocaleString() || '0'} {transaction?.currency || 'MAD'}</li>
+              <li>Moyen : {transaction?.paymentLabel || 'Paiement securise'}</li>
             </ul>
           </>
         }
@@ -142,6 +145,16 @@ const PaymentSuccessPage = () => {
                 <span>Date</span>
                 <strong>{formatDate(transaction?.timestamp || new Date().toISOString())}</strong>
               </li>
+              <li>
+                <span>Moyen</span>
+                <strong>{transaction?.paymentLabel || 'Paiement securise'}</strong>
+              </li>
+              {transaction?.paymentEmail ? (
+                <li>
+                  <span>Email de recu</span>
+                  <strong>{transaction.paymentEmail}</strong>
+                </li>
+              ) : null}
             </ul>
 
             <div className="receipt-card__amount">

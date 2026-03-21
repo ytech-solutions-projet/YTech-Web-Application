@@ -67,7 +67,13 @@ const sanitizeQuoteMetadata = (payload = {}) => {
     paymentTransactionId: normalizeText(
       metadata.paymentTransactionId || payload.paymentTransactionId,
       { maxLength: 120 }
-    )
+    ),
+    paymentMethod: normalizeText(metadata.paymentMethod || payload.paymentMethod, { maxLength: 30 }),
+    paymentProvider: normalizeText(metadata.paymentProvider || payload.paymentProvider, { maxLength: 30 }),
+    paymentCardBrand: normalizeText(metadata.paymentCardBrand || payload.paymentCardBrand, { maxLength: 60 }),
+    paymentLast4: normalizeText(metadata.paymentLast4 || payload.paymentLast4, { maxLength: 4 }),
+    paymentPayerEmail: normalizeEmail(metadata.paymentPayerEmail || payload.paymentPayerEmail),
+    paymentLabel: normalizeText(metadata.paymentLabel || payload.paymentLabel, { maxLength: 160 })
   };
 };
 
@@ -94,7 +100,13 @@ const toApiQuote = (row = {}) => {
     paymentAmount: metadata.paymentAmount ?? null,
     paymentCurrency: metadata.paymentCurrency || 'MAD',
     paymentPaidAt: metadata.paymentPaidAt || '',
-    paymentTransactionId: metadata.paymentTransactionId || ''
+    paymentTransactionId: metadata.paymentTransactionId || '',
+    paymentMethod: metadata.paymentMethod || '',
+    paymentProvider: metadata.paymentProvider || '',
+    paymentCardBrand: metadata.paymentCardBrand || '',
+    paymentLast4: metadata.paymentLast4 || '',
+    paymentPayerEmail: metadata.paymentPayerEmail || '',
+    paymentLabel: metadata.paymentLabel || ''
   };
 
   return {
@@ -109,6 +121,7 @@ const toApiQuote = (row = {}) => {
     name: row.sender_name || '',
     phone: row.sender_phone || '',
     company: row.company || '',
+    projectDescription: row.project_description || '',
     content: row.content || '',
     timestamp: row.created_at,
     status: row.status || 'pending',
