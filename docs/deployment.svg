@@ -1,0 +1,26 @@
+<svg width="1280" height="500" viewBox="0 0 1280 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="500" rx="32" fill="#F6F2EA"/>
+  <text x="80" y="86" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">Recommended deployment</text>
+  <text x="80" y="122" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Separation propre entre le serveur web et le serveur base de donnees.</text>
+
+  <rect x="100" y="170" width="480" height="240" rx="28" fill="#102B4E"/>
+  <text x="140" y="220" fill="#7DD3FC" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">WEB-SERVER</text>
+  <text x="140" y="274" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="32" font-weight="700">Frontend + Backend</text>
+  <text x="140" y="320" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="18">Nginx</text>
+  <text x="140" y="350" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="18">Node.js / Express</text>
+  <text x="140" y="380" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="18">Build React</text>
+
+  <rect x="700" y="170" width="480" height="240" rx="28" fill="#FFFFFF" stroke="#D7E1EB" stroke-width="2"/>
+  <text x="740" y="220" fill="#F97316" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">DB-SERVER</text>
+  <text x="740" y="274" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="32" font-weight="700">PostgreSQL</text>
+  <text x="740" y="320" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">users</text>
+  <text x="740" y="350" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">quotes</text>
+  <text x="740" y="380" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">messages / contact_requests / sessions</text>
+
+  <path d="M580 290H700" stroke="#14B8A6" stroke-width="10" stroke-linecap="round"/>
+  <path d="M666 272L700 290L666 308" fill="none" stroke="#14B8A6" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="520" y="240" width="230" height="96" rx="22" fill="#ECFEFF" stroke="#A5F3FC"/>
+  <text x="555" y="280" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">Private network</text>
+  <text x="555" y="308" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="15">Only the web-server talks to PostgreSQL</text>
+</svg>
