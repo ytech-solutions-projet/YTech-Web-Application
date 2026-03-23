@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { fetchJson } from '../utils/http';
-import { AUTH_CHANGE_EVENT, clearAuthSession } from '../utils/storage';
+import { AUTH_CHANGE_EVENT, clearAuthSession, removeStorageKey } from '../utils/storage';
 import './Header.css';
 
 const publicLinks = [
@@ -180,6 +180,7 @@ const Header = ({ theme = 'light', onToggleTheme = () => {} }) => {
     }
 
     clearAuthSession();
+    removeStorageKey('ytech-quote-draft');
     setIsLoggedIn(false);
     setUser(null);
     setIsMobileMenuOpen(false);

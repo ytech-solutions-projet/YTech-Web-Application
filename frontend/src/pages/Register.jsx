@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PhoneField from '../components/PhoneField';
 import PublicHero from '../components/PublicHero';
 import SiteFooter from '../components/SiteFooter';
 import { fetchJson } from '../utils/http';
+import { resolveSafeNextPath } from '../utils/navigation';
 import { isPhoneValueValid } from '../utils/phone';
-import { writeAuthSession } from '../utils/storage';
+import { clearAuthSession } from '../utils/storage';
 import '../styles/auth.css';
 
 const initialFormData = {
@@ -67,7 +68,7 @@ const termsSections = [
 const registerBenefits = [
   'Creation rapide de votre espace client',
   'Suivi centralise de vos demandes et messages',
-  "Acceptation claire des conditions avant validation"
+  "Verification email avant la premiere connexion"
 ];
 
 const registerCards = [
@@ -83,8 +84,8 @@ const registerCards = [
   },
   {
     eyebrow: 'Acces',
-    title: 'Connexion immediate apres inscription.',
-    text: 'Une fois le compte cree, vous etes redirige vers votre espace sans etape supplementaire.'
+    title: 'Activation apres verification email.',
+    text: 'Une fois le compte cree, vous recevez un lien pour confirmer votre email avant la premiere connexion.'
   }
 ];
 
@@ -95,6 +96,8 @@ const passwordRequirements = [
 ];
 
 const Register = () => {
+  const [searchParams] = useSearchParams();
+  const nextPath = resolveSafeNextPath(searchParams.get('next'), '/dashboard');
   const [formData, setFormData] = useState(initialFormData);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -223,6 +226,7 @@ const Register = () => {
     setSubmitError('');
 
     try {
+      const email = formData.email.trim().toLowerCase();
       const { payload } = await fetchJson('/api/auth/register', {
         method: 'POST',
         headers: {
@@ -230,7 +234,7 @@ const Register = () => {
         },
         body: JSON.stringify({
           name: formData.name.trim(),
-          email: formData.email.trim().toLowerCase(),
+          email,
           phone: formData.phone.trim(),
           company: formData.company.trim(),
           password: formData.password,
@@ -238,11 +242,25 @@ const Register = () => {
         })
       });
 
-      if (!writeAuthSession(payload)) {
-        throw new Error('Impossible de sauvegarder votre session localement');
+      try {
+        await fetchJson('/api/auth/logout', {
+          method: 'POST'
+        });
+      } catch (error) {
+        // If no prior session exists, we still want the new registration flow to continue.
+      } finally {
+        clearAuthSession();
       }
 
-      navigate('/dashboard');
+      navigate(
+        `/verify-email?email=${encodeURIComponent(payload.email || email)}&next=${encodeURIComponent(nextPath)}`,
+        {
+          state: {
+            devVerificationToken: payload.verificationToken || '',
+            devVerificationUrl: payload.verificationUrl || ''
+          }
+        }
+      );
     } catch (error) {
       setSubmitError(error.message || "Une erreur est survenue lors de l'inscription");
     } finally {
@@ -257,17 +275,17 @@ const Register = () => {
         title="Creer votre espace client"
         description="Inscrivez-vous pour centraliser vos demandes, vos messages et le suivi de vos projets dans un espace plus clair et assorti au reste du site."
         actions={[
-          { to: '/login', label: 'J ai deja un compte', variant: 'primary' },
+          { to: `/login?next=${encodeURIComponent(nextPath)}`, label: 'J ai deja un compte', variant: 'primary' },
           { to: '/legal', label: 'Voir les mentions legales', variant: 'secondary' }
         ]}
-        highlights={['Creation rapide', 'Lecture des conditions', 'Acces immediat']}
+        highlights={['Creation rapide', 'Lecture des conditions', 'Verification email']}
         aside={
           <>
             <span className="hero-panel__eyebrow">Inscription YTECH</span>
             <h2 className="hero-panel__title">Un compte simple a creer et facile a reutiliser.</h2>
             <p className="hero-panel__text">
               Le parcours reste direct, avec les informations essentielles et une validation
-              claire des conditions avant creation.
+              claire des conditions avant creation puis verification de l email.
             </p>
             <ul className="hero-panel__list">
               {registerBenefits.map((benefit) => (
@@ -300,19 +318,19 @@ const Register = () => {
               <h2 className="hero-panel__title">Quelques informations suffisent pour ouvrir votre espace.</h2>
               <p className="hero-panel__text">
                 Le compte est cree dans votre espace YTECH apres validation du
-                formulaire et acceptation des conditions.
+                formulaire, acceptation des conditions puis confirmation de l email.
               </p>
               <ul className="stack-list">
                 <li>Nom, email, telephone et entreprise si besoin.</li>
                 <li>Lecture complete des conditions avant activation.</li>
-                <li>Connexion immediate apres creation du compte.</li>
+                <li>Verification email avant la premiere connexion.</li>
               </ul>
               <div className="auth-note">
                 Gardez votre email et votre mot de passe pour vous reconnecter ensuite depuis la
                 page de connexion, meme sur un autre navigateur.
               </div>
               <div className="auth-quick-links">
-                <Link className="text-link" to="/login">
+                <Link className="text-link" to={`/login?next=${encodeURIComponent(nextPath)}`}>
                   J ai deja un compte
                 </Link>
                 <Link className="text-link" to="/legal">
@@ -324,7 +342,7 @@ const Register = () => {
             <div className="marketing-form-card auth-form-card">
               <h2 className="marketing-form-card__title">Creer un compte</h2>
               <p className="marketing-form-card__text">
-                Remplissez le formulaire puis validez les conditions pour continuer.
+                Remplissez le formulaire puis validez les conditions. Nous vous demanderons ensuite de verifier votre email.
               </p>
 
               {submitError ? <div className="marketing-alert">{submitError}</div> : null}
@@ -498,7 +516,7 @@ const Register = () => {
         </div>
       </section>
 
-      <SiteFooter note="Creation de compte client dans un parcours plus coherent avec les autres pages du site." />
+      <SiteFooter note="Creation de compte client avec verification email avant connexion." />
 
       {isTermsModalOpen ? (
         <div className="marketing-modal__overlay" role="presentation" onClick={handleCloseTermsModal}>

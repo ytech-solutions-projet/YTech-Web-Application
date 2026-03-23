@@ -4,7 +4,13 @@
  */
 
 const crypto = require('crypto');
-const fetch = require('node-fetch');
+const fetch = (...args) => {
+  if (typeof globalThis.fetch === 'function') {
+    return globalThis.fetch(...args);
+  }
+
+  return import('node-fetch').then(({ default: nodeFetch }) => nodeFetch(...args));
+};
 
 class SecurityTestingMiddleware {
   constructor() {

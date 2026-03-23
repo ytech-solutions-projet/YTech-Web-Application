@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PublicHero from '../components/PublicHero';
 import SiteFooter from '../components/SiteFooter';
 import { fetchJson } from '../utils/http';
+import { resolveSafeNextPath } from '../utils/navigation';
 import { writeAuthSession } from '../utils/storage';
 import '../styles/auth.css';
 
@@ -14,7 +15,7 @@ const initialFormData = {
 const loginBenefits = [
   'Acces rapide a votre dashboard client',
   'Suivi des messages et des demandes en un seul endroit',
-  'Redirection automatique vers le bon espace apres connexion'
+  'Connexion reservee aux emails verifies'
 ];
 
 const loginCards = [
@@ -36,10 +37,21 @@ const loginCards = [
 ];
 
 const Login = () => {
-  const [formData, setFormData] = useState(initialFormData);
+  const [searchParams] = useSearchParams();
+  const initialEmail = searchParams.get('email') || '';
+  const isEmailJustVerified = searchParams.get('verified') === '1';
+  const nextPath = resolveSafeNextPath(searchParams.get('next'), '/dashboard');
+  const [formData, setFormData] = useState(() => ({
+    ...initialFormData,
+    email: initialEmail
+  }));
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [submitInfo, setSubmitInfo] = useState(
+    isEmailJustVerified ? 'Email verifie. Vous pouvez maintenant vous connecter.' : ''
+  );
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const navigate = useNavigate();
 
   const handleChange = (event) => {
@@ -55,6 +67,14 @@ const Login = () => {
         ...prev,
         [name]: ''
       }));
+    }
+
+    if (submitError) {
+      setSubmitError('');
+    }
+
+    if (submitInfo) {
+      setSubmitInfo('');
     }
   };
 
@@ -84,6 +104,8 @@ const Login = () => {
 
     setIsSubmitting(true);
     setSubmitError('');
+    setSubmitInfo('');
+    setUnverifiedEmail('');
 
     try {
       const { payload } = await fetchJson('/api/auth/login', {
@@ -101,13 +123,12 @@ const Login = () => {
         throw new Error('Impossible de sauvegarder votre session localement');
       }
 
-      if (payload.user?.role === 'admin') {
-        navigate('/dashboard');
-        return;
+      navigate(payload.user?.role === 'admin' ? '/dashboard' : nextPath);
+    } catch (error) {
+      if (error.payload?.code === 'EMAIL_NOT_VERIFIED') {
+        setUnverifiedEmail(error.payload?.email || formData.email.trim().toLowerCase());
       }
 
-      navigate('/dashboard');
-    } catch (error) {
       setSubmitError(error.message || 'Impossible de vous connecter pour le moment');
     } finally {
       setIsSubmitting(false);
@@ -121,16 +142,16 @@ const Login = () => {
         title="Accedez a votre espace client"
         description="Connectez-vous pour retrouver vos demandes, vos messages et le suivi de votre projet dans un espace plus clair et coherent avec le reste du site."
         actions={[
-          { to: '/register', label: 'Creer un compte', variant: 'primary' },
+          { to: `/register?next=${encodeURIComponent(nextPath)}`, label: 'Creer un compte', variant: 'primary' },
           { to: '/contact?intent=support', label: "Besoin d'aide", variant: 'secondary' }
         ]}
-        highlights={['Dashboard client', 'Suivi projet', 'Acces rapide']}
+        highlights={['Dashboard client', 'Suivi projet', 'Email verifie']}
         aside={
           <>
             <span className="hero-panel__eyebrow">Acces rapide</span>
             <h2 className="hero-panel__title">Retrouvez l essentiel sans changer d univers visuel.</h2>
             <p className="hero-panel__text">
-              Cette page reprend la meme base que le site public tout en restant simple a utiliser.
+              Cette page reprend la meme base que le site public, avec verification email avant ouverture de session.
             </p>
             <ul className="hero-panel__list">
               {loginBenefits.map((benefit) => (
@@ -162,17 +183,21 @@ const Login = () => {
               <span className="hero-panel__eyebrow">Avant de continuer</span>
               <h2 className="hero-panel__title">Utilisez votre compte YTECH pour continuer.</h2>
               <p className="hero-panel__text">
-                La connexion passe maintenant par l API YTECH. Si vous etes admin, la redirection
-                se fait automatiquement vers l espace de gestion.
+                La connexion passe maintenant par l API YTECH avec verification email prealable.
+                Si vous etes admin, la redirection se fait automatiquement vers l espace de gestion.
               </p>
               <ul className="stack-list">
                 <li>Entrez l email utilise lors de votre inscription.</li>
+                <li>Verifiez votre email si c est votre premiere connexion.</li>
                 <li>Utilisez le mot de passe associe a votre espace client.</li>
                 <li>Besoin d aide ? Nous pouvons vous orienter rapidement.</li>
               </ul>
               <div className="auth-quick-links">
-                <Link className="text-link" to="/register">
+                <Link className="text-link" to={`/register?next=${encodeURIComponent(nextPath)}`}>
                   Creer un compte
+                </Link>
+                <Link className="text-link" to={`/verify-email?next=${encodeURIComponent(nextPath)}`}>
+                  Verifier mon email
                 </Link>
                 <Link className="text-link" to="/forgot-password">
                   Mot de passe oublie
@@ -189,7 +214,18 @@ const Login = () => {
                 Entrez vos identifiants pour retrouver votre espace YTECH.
               </p>
 
+              {submitInfo ? <div className="marketing-alert">{submitInfo}</div> : null}
               {submitError ? <div className="marketing-alert">{submitError}</div> : null}
+              {unverifiedEmail ? (
+                <div className="auth-note">
+                  Votre compte existe mais l email n est pas encore confirme.{' '}
+                  <Link
+                    to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}&next=${encodeURIComponent(nextPath)}`}
+                  >
+                    Verifier ou renvoyer le lien
+                  </Link>
+                </div>
+              ) : null}
 
               <form className="marketing-form auth-form" onSubmit={handleSubmit}>
                 <div className="marketing-field">
@@ -220,7 +256,7 @@ const Login = () => {
                     placeholder="Entrez votre mot de passe"
                   />
                   <div className="marketing-field__hint">
-                    Votre compte doit etre actif cote YTECH pour etre reconnu.
+                    Votre compte doit etre actif et votre email deja verifie cote YTECH.
                   </div>
                   <div className="marketing-field__hint">
                     Mot de passe oublie ? <Link to="/forgot-password">Recevoir un lien de reinitialisation</Link>
@@ -241,10 +277,14 @@ const Login = () => {
 
               <div className="auth-form-footer">
                 <p>
-                  Pas encore de compte ? <Link to="/register">S inscrire</Link>
+                  Pas encore de compte ? <Link to={`/register?next=${encodeURIComponent(nextPath)}`}>S inscrire</Link>
                 </p>
                 <p>
                   Mot de passe oublie ? <Link to="/forgot-password">Reinitialiser mon acces</Link>
+                </p>
+                <p>
+                  Email non verifie ?{' '}
+                  <Link to={`/verify-email?next=${encodeURIComponent(nextPath)}`}>Verifier ou renvoyer le lien</Link>
                 </p>
                 <p>
                   Besoin d aide ? <Link to="/contact?intent=support">Nous contacter</Link>
@@ -255,7 +295,7 @@ const Login = () => {
         </div>
       </section>
 
-      <SiteFooter note="Connexion client et suivi projet dans un espace visuellement aligne avec le reste du site." />
+      <SiteFooter note="Connexion client activee seulement apres verification email." />
     </div>
   );
 };

@@ -9,6 +9,14 @@ const initialFormData = {
   email: ''
 };
 
+const buildLocalResetUrl = (resetToken) => {
+  if (!resetToken || typeof window === 'undefined') {
+    return '';
+  }
+
+  return `${window.location.origin}/reset-password?token=${encodeURIComponent(resetToken)}`;
+};
+
 const forgotPasswordBenefits = [
   'Envoi discret sans reveler si un compte existe',
   'Lien de reinitialisation a duree limitee',
@@ -39,6 +47,8 @@ const ForgotPassword = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
+  const [devResetUrl, setDevResetUrl] = useState('');
+  const [devResetToken, setDevResetToken] = useState('');
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -91,6 +101,8 @@ const ForgotPassword = () => {
         })
       });
 
+      setDevResetToken(payload.resetToken || '');
+      setDevResetUrl(payload.resetUrl || buildLocalResetUrl(payload.resetToken || ''));
       setSubmitSuccess(
         payload.message || 'Si cet email existe, un lien de reinitialisation sera envoye.'
       );
@@ -174,6 +186,15 @@ const ForgotPassword = () => {
 
               {submitError ? <div className="marketing-alert">{submitError}</div> : null}
               {submitSuccess ? <div className="marketing-alert">{submitSuccess}</div> : null}
+              {devResetUrl ? (
+                <div className="auth-dev-panel">
+                  <p>
+                    Mode local: aucun email n est envoye ici. Ouvrez directement{' '}
+                    <a href={devResetUrl}>le lien de reinitialisation</a>.
+                  </p>
+                  {devResetToken ? <code>{devResetToken}</code> : null}
+                </div>
+              ) : null}
 
               <form className="marketing-form auth-form" onSubmit={handleSubmit}>
                 <div className="marketing-field">

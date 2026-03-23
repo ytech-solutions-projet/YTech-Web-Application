@@ -4,7 +4,7 @@ const rateLimit = require('express-rate-limit');
 const Message = require('../models/Message');
 const Quote = require('../models/Quote');
 const User = require('../models/User');
-const { authenticateRequest, maybeAuthenticateRequest, requireAdmin } = require('../middleware/auth');
+const { authenticateRequest, requireAdmin } = require('../middleware/auth');
 const { buildStoredPaymentMetadata, normalizePaymentPayload, validatePaymentPayload } = require('../utils/payment');
 const { normalizeEmail, normalizeText, parseInteger } = require('../utils/security');
 const { isValidPhone, normalizePhone } = require('../utils/phone');
@@ -65,6 +65,24 @@ const normalizeQuotePayload = (payload = {}) => {
       { maxLength: 255 }
     ),
     content: normalizeText(payload.content, { maxLength: 10000, multiline: true })
+  };
+};
+
+const applyAuthenticatedIdentity = (payload = {}, user = null) => {
+  if (!user) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    name: user.name || payload.name,
+    email: user.email || payload.email,
+    phone: user.phone || payload.phone,
+    company: user.company || payload.company,
+    senderName: user.name || payload.senderName,
+    senderEmail: user.email || payload.senderEmail,
+    senderPhone: user.phone || payload.senderPhone,
+    senderId: user.email || payload.senderId
   };
 };
 
@@ -254,9 +272,11 @@ const notifyPaymentToAdmin = async (quote, payer) => {
   });
 };
 
-router.post('/', quoteLimiter, maybeAuthenticateRequest, async (req, res) => {
+router.post('/', quoteLimiter, authenticateRequest, async (req, res) => {
   try {
-    const quotePayload = normalizeQuotePayload(req.body);
+    const quotePayload = normalizeQuotePayload(
+      applyAuthenticatedIdentity(req.body, req.user?.details || null)
+    );
     const validationError = validateQuotePayload(quotePayload);
 
     if (validationError) {

@@ -138,6 +138,12 @@ class RBACMiddleware {
 
       // Get user role from request (set by authentication middleware)
       const userRole = req.user?.role || 'GUEST';
+
+      // Authentication is resolved later on route-level middleware for most API endpoints.
+      // When no user has been attached yet, defer the decision instead of blocking public/auth flows.
+      if (!req.user) {
+        return next();
+      }
       
       // Default permission check based on route
       const resource = this.extractResourceFromPath(req.path);

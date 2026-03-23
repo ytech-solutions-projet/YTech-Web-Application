@@ -5,6 +5,14 @@ import PublicHero from '../components/PublicHero';
 import SiteFooter from '../components/SiteFooter';
 import { isPhoneValueValid } from '../utils/phone';
 import { submitQuoteRequest } from '../utils/businessApi';
+import {
+  AUTH_CHANGE_EVENT,
+  clearAuthSession,
+  readAuthUser,
+  readJsonStorage,
+  removeStorageKey,
+  writeJsonStorage
+} from '../utils/storage';
 
 const initialFormData = {
   name: '',
@@ -162,11 +170,11 @@ const highlights = [
   }
 ];
 
-const readPrefilledForm = () => {
-  try {
-    const rawUser = localStorage.getItem('user');
-    const user = rawUser ? JSON.parse(rawUser) : null;
+const QUOTE_DRAFT_STORAGE_KEY = 'ytech-quote-draft';
+const QUOTE_NEXT_PATH = '/devis';
 
+const buildUserPrefilledForm = (user = readAuthUser()) => {
+  try {
     if (!user) {
       return initialFormData;
     }
@@ -184,16 +192,118 @@ const readPrefilledForm = () => {
   }
 };
 
+const readQuoteDraft = () => {
+  const draft = readJsonStorage(QUOTE_DRAFT_STORAGE_KEY, null);
+  if (!draft || typeof draft !== 'object') {
+    return null;
+  }
+
+  return {
+    name: `${draft.name || ''}`,
+    email: `${draft.email || ''}`,
+    phone: `${draft.phone || ''}`,
+    company: `${draft.company || ''}`,
+    service: `${draft.service || ''}`,
+    projectDescription: `${draft.projectDescription || ''}`,
+    budget: `${draft.budget || ''}`,
+    timeline: `${draft.timeline || ''}`,
+    features: Array.isArray(draft.features) ? draft.features.filter((feature) => typeof feature === 'string') : []
+  };
+};
+
+const buildQuoteFormState = (user = readAuthUser()) => {
+  const userPrefill = buildUserPrefilledForm(user);
+
+  if (!user) {
+    return initialFormData;
+  }
+
+  const draft = readQuoteDraft();
+
+  if (!draft) {
+    return userPrefill;
+  }
+
+  return {
+    ...initialFormData,
+    ...draft,
+    name: userPrefill.name || draft.name || '',
+    email: userPrefill.email || draft.email || '',
+    phone: userPrefill.phone || draft.phone || '',
+    company: userPrefill.company || draft.company || ''
+  };
+};
+
 const Devis = () => {
   const [formData, setFormData] = useState(initialFormData);
+  const [authUser, setAuthUser] = useState(() => readAuthUser());
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [draftNotice, setDraftNotice] = useState('');
 
   useEffect(() => {
-    setFormData(readPrefilledForm());
+    const currentUser = readAuthUser();
+    const quoteDraft = currentUser ? readQuoteDraft() : null;
+    setFormData(buildQuoteFormState(currentUser));
+
+    if (quoteDraft) {
+      setDraftNotice(
+        'Votre brouillon de devis a ete retrouve. Vous pouvez maintenant l envoyer.'
+      );
+    }
   }, []);
+
+  useEffect(() => {
+    const syncAuthState = () => {
+      setAuthUser(readAuthUser());
+    };
+
+    window.addEventListener('storage', syncAuthState);
+    window.addEventListener(AUTH_CHANGE_EVENT, syncAuthState);
+
+    return () => {
+      window.removeEventListener('storage', syncAuthState);
+      window.removeEventListener(AUTH_CHANGE_EVENT, syncAuthState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!authUser) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      name: authUser.name || '',
+      email: authUser.email || '',
+      phone: authUser.phone || '',
+      company: authUser.company || ''
+    }));
+    setAuthModalOpen(false);
+  }, [authUser]);
+
+  useEffect(() => {
+    if (!authModalOpen) {
+      return undefined;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [authModalOpen]);
+
+  const persistQuoteDraft = () => {
+    writeJsonStorage(QUOTE_DRAFT_STORAGE_KEY, {
+      ...formData,
+      features: [...formData.features]
+    });
+  };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -208,6 +318,14 @@ const Devis = () => {
         ...prev,
         [name]: ''
       }));
+    }
+
+    if (submitError) {
+      setSubmitError('');
+    }
+
+    if (draftNotice) {
+      setDraftNotice('');
     }
   };
 
@@ -322,6 +440,14 @@ const Devis = () => {
       return;
     }
 
+    const currentAuthUser = authUser || readAuthUser();
+    if (!currentAuthUser) {
+      persistQuoteDraft();
+      setAuthModalOpen(true);
+      setSubmitError('');
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError('');
 
@@ -376,9 +502,19 @@ const Devis = () => {
 
       await submitQuoteRequest(quoteRequest);
 
+      removeStorageKey(QUOTE_DRAFT_STORAGE_KEY);
       setIsSubmitted(true);
       setFormData(initialFormData);
     } catch (error) {
+      if (error.status === 401 || error.status === 403) {
+        persistQuoteDraft();
+        clearAuthSession();
+        setAuthUser(null);
+        setAuthModalOpen(true);
+        setSubmitError('');
+        return;
+      }
+
       console.error('Quote form error:', error);
       setSubmitError(error.message || "Une erreur est survenue lors de l'envoi de la demande. Veuillez reessayer.");
     } finally {
@@ -407,7 +543,7 @@ const Devis = () => {
                   className="marketing-button marketing-button--accent"
                   onClick={() => {
                     setIsSubmitted(false);
-                    setFormData(readPrefilledForm());
+                    setFormData(buildQuoteFormState());
                   }}
                 >
                   Envoyer un autre devis
@@ -524,10 +660,11 @@ const Devis = () => {
             <div className="marketing-form-card">
               <h2 className="marketing-form-card__title">Votre projet</h2>
               <p className="marketing-form-card__text">
-                Remplissez les champs essentiels, nous nous chargeons du reste pour clarifier la
-                proposition.
+                Remplissez les champs essentiels. Si vous n avez pas encore de compte, nous vous
+                demanderons simplement de vous connecter ou de vous inscrire juste avant l envoi.
               </p>
 
+              {draftNotice ? <div className="auth-note">{draftNotice}</div> : null}
               {submitError ? <div className="marketing-alert">{submitError}</div> : null}
 
               <form className="marketing-form" onSubmit={handleSubmit}>
@@ -540,9 +677,15 @@ const Devis = () => {
                       type="text"
                       value={formData.name}
                       onChange={handleChange}
+                      disabled={Boolean(authUser)}
                       className={`marketing-input ${errors.name ? 'is-error' : ''}`}
                       placeholder="Jean Dupont"
                     />
+                    {authUser ? (
+                      <div className="marketing-field__hint">
+                        Ce nom vient directement du compte client connecte.
+                      </div>
+                    ) : null}
                     {errors.name ? <div className="marketing-field__error">{errors.name}</div> : null}
                   </div>
 
@@ -554,9 +697,15 @@ const Devis = () => {
                       type="email"
                       value={formData.email}
                       onChange={handleChange}
+                      disabled={Boolean(authUser)}
                       className={`marketing-input ${errors.email ? 'is-error' : ''}`}
                       placeholder="votre@email.com"
                     />
+                    {authUser ? (
+                      <div className="marketing-field__hint">
+                        Cet email est verrouille sur celui utilise pour la connexion.
+                      </div>
+                    ) : null}
                     {errors.email ? <div className="marketing-field__error">{errors.email}</div> : null}
                   </div>
                 </div>
@@ -568,6 +717,7 @@ const Devis = () => {
                     value={formData.phone}
                     onChange={handleChange}
                     error={errors.phone}
+                    disabled={Boolean(authUser)}
                   />
 
                   <div className="marketing-field">
@@ -578,9 +728,15 @@ const Devis = () => {
                       type="text"
                       value={formData.company}
                       onChange={handleChange}
+                      disabled={Boolean(authUser)}
                       className="marketing-input"
                       placeholder="Nom de votre entreprise"
                     />
+                    {authUser ? (
+                      <div className="marketing-field__hint">
+                        Cette information est reprise depuis votre profil client.
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -694,6 +850,84 @@ const Devis = () => {
           </div>
         </div>
       </section>
+
+      {authModalOpen ? (
+        <div
+          className="marketing-modal__overlay"
+          role="presentation"
+          onClick={() => setAuthModalOpen(false)}
+        >
+          <div
+            className="marketing-modal auth-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quote-auth-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="marketing-modal__header">
+              <span className="marketing-modal__eyebrow">Compte requis</span>
+              <h3 id="quote-auth-title" className="marketing-modal__title">
+                Connectez-vous avant d envoyer le devis
+              </h3>
+              <p className="marketing-modal__text">
+                Votre brouillon est garde ici. Il ne vous reste qu a vous connecter ou a creer un
+                compte pour rattacher cette demande a votre espace client.
+              </p>
+              <button
+                type="button"
+                className="marketing-modal__close"
+                aria-label="Fermer"
+                onClick={() => setAuthModalOpen(false)}
+              >
+                x
+              </button>
+            </div>
+
+            <div className="marketing-modal__body auth-modal__body">
+              <div className="marketing-modal__grid">
+                <div className="marketing-modal__item">
+                  <span>Service prepare</span>
+                  <strong>{selectedService?.name || 'A confirmer'}</strong>
+                </div>
+                <div className="marketing-modal__item">
+                  <span>Budget estime</span>
+                  <strong>{selectedBudgetOption?.label || 'Non precise'}</strong>
+                </div>
+                <div className="marketing-modal__item">
+                  <span>Delai souhaite</span>
+                  <strong>{selectedTimelineOption?.label || 'Non precise'}</strong>
+                </div>
+                <div className="marketing-modal__item">
+                  <span>Etape suivante</span>
+                  <strong>Connexion ou inscription, puis envoi du devis</strong>
+                </div>
+              </div>
+
+              <div className="auth-modal__footer">
+                <div className="auth-modal__status">
+                  Vos informations resteront pre-remplies quand vous reviendrez sur cette page.
+                </div>
+                <div className="marketing-modal__actions">
+                  <Link
+                    to={`/login?next=${encodeURIComponent(QUOTE_NEXT_PATH)}`}
+                    className="marketing-button marketing-button--dark"
+                    onClick={persistQuoteDraft}
+                  >
+                    Se connecter
+                  </Link>
+                  <Link
+                    to={`/register?next=${encodeURIComponent(QUOTE_NEXT_PATH)}`}
+                    className="marketing-button marketing-button--accent"
+                    onClick={persistQuoteDraft}
+                  >
+                    Creer un compte
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <SiteFooter note="Une page devis plus ambitieuse visuellement, mais surtout plus simple a renseigner et a exploiter ensuite." />
     </div>

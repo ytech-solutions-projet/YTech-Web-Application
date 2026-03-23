@@ -14,7 +14,7 @@ class InputValidationMiddleware {
       string: {
         minLength: 1,
         maxLength: 1000,
-        allowedChars: /^[a-zA-Z0-9\s\-_.,@#$%^&*()[\]{}|\\:"'<>?/~`]+$/,
+        allowedChars: /^[^\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]*$/u,
         sanitize: true
       },
       
@@ -171,6 +171,20 @@ class InputValidationMiddleware {
 
     // Handle different data types
     if (typeof value === 'string') {
+      const fieldType = this.getFieldType(fieldPath);
+
+      if (fieldType === 'email') {
+        return this.validateEmailString(value, fieldPath);
+      }
+
+      if (fieldType === 'phone') {
+        return this.validatePhoneString(value, fieldPath);
+      }
+
+      if (fieldType === 'password') {
+        return this.validateOpaqueSecret(value, fieldPath);
+      }
+
       return this.validateString(value, fieldPath);
     } else if (typeof value === 'number') {
       return this.validateNumber(value, fieldPath);
@@ -193,6 +207,28 @@ class InputValidationMiddleware {
     }
 
     return result;
+  }
+
+  getFieldType(fieldPath = '') {
+    const normalizedPath = `${fieldPath}`.toLowerCase();
+    const fieldName = normalizedPath
+      .split('.')
+      .pop()
+      ?.replace(/\[\d+\]/g, '') || normalizedPath;
+
+    if (fieldName.includes('password')) {
+      return 'password';
+    }
+
+    if (fieldName.includes('email')) {
+      return 'email';
+    }
+
+    if (fieldName.includes('phone') || fieldName.includes('telephone') || fieldName.includes('tel')) {
+      return 'phone';
+    }
+
+    return 'string';
   }
 
   // Validate string values
@@ -260,8 +296,8 @@ class InputValidationMiddleware {
 
     // SQL injection detection
     const sqlPatterns = [
-      /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b)/i,
-      /(--|\*\/|\/\*|;|'|")/,
+      /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b\s+(FROM|INTO|TABLE|DATABASE|VALUES|SET|ALL|SELECT)\b/i,
+      /(--|\*\/|\/\*)/,
       /(\b(OR|AND)\s+\d+\s*=\s*\d+)/i,
       /(\b(OR|AND)\s+['"]?\w+['"]?\s*=\s*['"]?\w+['"]?)/i
     ];
@@ -282,6 +318,114 @@ class InputValidationMiddleware {
     // Sanitize string
     if (this.validationRules.string.sanitize) {
       result.sanitized = this.sanitizeString(value);
+    }
+
+    return result;
+  }
+
+  validateEmailString(value, fieldPath) {
+    const result = {
+      isValid: true,
+      errors: [],
+      sanitized: value
+    };
+
+    const emailValidation = this.validateEmail(value);
+
+    if (!emailValidation.isValid) {
+      result.isValid = false;
+      result.errors.push({
+        field: fieldPath,
+        value,
+        error: emailValidation.error,
+        code: emailValidation.code
+      });
+      return result;
+    }
+
+    result.sanitized = emailValidation.sanitized || value.trim().toLowerCase();
+    return result;
+  }
+
+  validatePhoneString(value, fieldPath) {
+    const result = {
+      isValid: true,
+      errors: [],
+      sanitized: `${value}`.trim()
+    };
+
+    const rules = this.validationRules.phone;
+    const trimmedValue = `${value}`.trim();
+
+    if (trimmedValue.length < rules.minLength) {
+      result.isValid = false;
+      result.errors.push({
+        field: fieldPath,
+        value,
+        error: `Phone number too short (minimum ${rules.minLength} characters)`,
+        code: 'PHONE_TOO_SHORT'
+      });
+    }
+
+    if (trimmedValue.length > rules.maxLength) {
+      result.isValid = false;
+      result.errors.push({
+        field: fieldPath,
+        value,
+        error: `Phone number too long (maximum ${rules.maxLength} characters)`,
+        code: 'PHONE_TOO_LONG'
+      });
+    }
+
+    if (!rules.pattern.test(trimmedValue)) {
+      result.isValid = false;
+      result.errors.push({
+        field: fieldPath,
+        value,
+        error: 'Phone number contains invalid characters',
+        code: 'INVALID_PHONE'
+      });
+    }
+
+    return result;
+  }
+
+  validateOpaqueSecret(value, fieldPath) {
+    const result = {
+      isValid: true,
+      errors: [],
+      sanitized: value
+    };
+
+    if (typeof value !== 'string' || value.length === 0) {
+      result.isValid = false;
+      result.errors.push({
+        field: fieldPath,
+        value: '[REDACTED]',
+        error: 'Secret value is required',
+        code: 'SECRET_REQUIRED'
+      });
+      return result;
+    }
+
+    if (value.length > this.validationRules.password.maxLength) {
+      result.isValid = false;
+      result.errors.push({
+        field: fieldPath,
+        value: '[REDACTED]',
+        error: `Secret too long (maximum ${this.validationRules.password.maxLength} characters)`,
+        code: 'SECRET_TOO_LONG'
+      });
+    }
+
+    if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(value)) {
+      result.isValid = false;
+      result.errors.push({
+        field: fieldPath,
+        value: '[REDACTED]',
+        error: 'Secret contains invalid control characters',
+        code: 'INVALID_SECRET'
+      });
     }
 
     return result;
@@ -428,18 +572,17 @@ class InputValidationMiddleware {
 
   // Sanitize string
   sanitizeString(str) {
-    // HTML entity encoding
-    let sanitized = validator.escape(str);
-    
-    // XSS filtering
-    sanitized = xss(sanitized);
-    
+    let sanitized = `${str}`;
+
     // Remove null bytes
     sanitized = sanitized.replace(/\0/g, '');
-    
+
+    // XSS filtering
+    sanitized = xss(sanitized);
+
     // Trim whitespace
     sanitized = sanitized.trim();
-    
+
     return sanitized;
   }
 

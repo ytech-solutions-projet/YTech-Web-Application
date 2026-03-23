@@ -160,7 +160,10 @@ export const fetchJson = async (input, options = {}) => {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok || payload?.success === false) {
-    throw new Error(payload?.error || payload?.message || 'Erreur de communication avec le serveur');
+    const error = new Error(payload?.error || payload?.message || 'Erreur de communication avec le serveur');
+    error.payload = payload || {};
+    error.status = response.status;
+    throw error;
   }
 
   return {

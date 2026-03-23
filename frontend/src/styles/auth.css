@@ -58,6 +58,38 @@
   font-weight: 800;
 }
 
+.auth-dev-panel {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(15, 118, 110, 0.22);
+  border-radius: 18px;
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--brand-ink);
+}
+
+.auth-dev-panel p {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.auth-dev-panel a {
+  color: var(--brand-accent);
+  font-weight: 800;
+  word-break: break-all;
+}
+
+.auth-dev-panel code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 0.8rem 0.9rem;
+  border-radius: 14px;
+  background: rgba(18, 48, 77, 0.08);
+  color: var(--brand-ink);
+  font-size: 0.83rem;
+}
+
 .auth-button-secondary {
   display: inline-flex;
   align-items: center;

@@ -14,7 +14,8 @@ const PhoneField = ({
   value = '',
   error = '',
   onChange = () => {},
-  fallbackCountryCode = DEFAULT_PHONE_COUNTRY
+  fallbackCountryCode = DEFAULT_PHONE_COUNTRY,
+  disabled = false
 }) => {
   const parsedPhone = parsePhoneValue(value, fallbackCountryCode);
   const [countryCode, setCountryCode] = useState(parsedPhone.countryCode);
@@ -62,6 +63,7 @@ const PhoneField = ({
           className={`marketing-select marketing-phone-group__country ${error ? 'is-error' : ''}`}
           value={countryCode}
           onChange={handleCountryChange}
+          disabled={disabled}
           aria-label="Selectionner un pays"
         >
           {PHONE_COUNTRIES.map((country) => (
@@ -78,12 +80,15 @@ const PhoneField = ({
           name={name}
           value={localNumber}
           onChange={handleNumberChange}
+          disabled={disabled}
           placeholder={getPhonePlaceholder(countryCode)}
           autoComplete="tel"
         />
       </div>
       <div className="marketing-field__hint">
-        Vous pouvez saisir le numero avec ou sans le 0 initial.
+        {disabled
+          ? 'Ce numero vient directement du compte client connecte.'
+          : 'Vous pouvez saisir le numero avec ou sans le 0 initial.'}
       </div>
       {error ? <div className="marketing-field__error">{error}</div> : null}
     </div>

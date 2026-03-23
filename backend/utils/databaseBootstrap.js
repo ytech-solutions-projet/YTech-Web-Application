@@ -111,6 +111,26 @@ const createPasswordResetTokensTable = async (userIdType = 'INTEGER') => {
   `);
 };
 
+const createEmailVerificationTokensTable = async (userIdType = 'INTEGER') => {
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS email_verification_tokens (
+      id SERIAL PRIMARY KEY,
+      user_id ${userIdType} NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash VARCHAR(255) NOT NULL UNIQUE,
+      request_ip VARCHAR(64),
+      user_agent TEXT,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await database.execute(`
+    CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_user_expires_at
+    ON email_verification_tokens(user_id, expires_at DESC)
+  `);
+};
+
 const createContactRequestsTable = async (userIdType = 'INTEGER') => {
   await database.execute(`
     CREATE TABLE IF NOT EXISTS contact_requests (
@@ -304,6 +324,11 @@ const ensureSchema = async () => {
   const passwordResetColumns = await getTableColumns('password_reset_tokens');
   if (passwordResetColumns.size === 0) {
     await createPasswordResetTokensTable(userIdType);
+  }
+
+  const emailVerificationColumns = await getTableColumns('email_verification_tokens');
+  if (emailVerificationColumns.size === 0) {
+    await createEmailVerificationTokensTable(userIdType);
   }
 
   const contactColumns = await getTableColumns('contact_requests');

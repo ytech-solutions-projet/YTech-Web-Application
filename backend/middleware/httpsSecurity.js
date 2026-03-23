@@ -214,12 +214,14 @@ class HTTPSSecurityMiddleware {
     return (req, res, next) => {
       // Log TLS session information for security monitoring
       if (req.socket) {
+        const canReadCipher = typeof req.socket.getCipher === 'function';
+        const canReadPeerCertificate = typeof req.socket.getPeerCertificate === 'function';
         const tlsInfo = {
-          protocol: req.socket.protocol,
-          cipher: req.socket.getCipher(),
-          authorized: req.socket.authorized,
-          authorizationError: req.socket.authorizationError,
-          peerCertificate: req.socket.getPeerCertificate()
+          protocol: req.socket.alpnProtocol || req.socket.protocol || null,
+          cipher: canReadCipher ? req.socket.getCipher() : null,
+          authorized: Boolean(req.socket.authorized),
+          authorizationError: req.socket.authorizationError || null,
+          peerCertificate: canReadPeerCertificate ? req.socket.getPeerCertificate() : null
         };
 
         // Log weak cipher suites
@@ -229,7 +231,7 @@ class HTTPSSecurityMiddleware {
         }
 
         // Log TLS version
-        if (tlsInfo.protocol !== 'TLSv1.3') {
+        if (tlsInfo.protocol && tlsInfo.protocol !== 'TLSv1.3') {
           console.warn('[SECURITY] Non-TLS 1.3 connection detected:', tlsInfo.protocol);
         }
       }

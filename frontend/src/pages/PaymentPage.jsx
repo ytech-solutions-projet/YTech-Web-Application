@@ -86,37 +86,6 @@ const buildInitialPaymentForm = (user) => ({
   agreementAccepted: false
 });
 
-const buildTestCardExpiry = () => {
-  const nextDate = new Date();
-  nextDate.setFullYear(nextDate.getFullYear() + 2);
-
-  return `${String(nextDate.getMonth() + 1).padStart(2, '0')}/${String(nextDate.getFullYear()).slice(-2)}`;
-};
-
-const TEST_CARD_OPTIONS = [
-  {
-    id: 'visa',
-    label: 'Visa test',
-    cardholderName: 'Test Visa',
-    cardNumber: '4242424242424242',
-    cvc: '123'
-  },
-  {
-    id: 'mastercard',
-    label: 'Mastercard test',
-    cardholderName: 'Test Mastercard',
-    cardNumber: '5555555555554444',
-    cvc: '123'
-  },
-  {
-    id: 'amex',
-    label: 'Amex test',
-    cardholderName: 'Test Amex',
-    cardNumber: '378282246310005',
-    cvc: '1234'
-  }
-];
-
 const PaymentPage = () => {
   const [user, setUser] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -206,7 +175,6 @@ const PaymentPage = () => {
 
   const quoteCurrency = linkedQuote?.metadata?.paymentCurrency || 'MAD';
   const cardBrand = detectCardBrand(paymentForm.cardNumber);
-  const testCardExpiry = useMemo(() => buildTestCardExpiry(), []);
   const canPayQuote = linkedQuote?.status === 'approved';
   const isQuoteAlreadyPaid = linkedQuote?.status === 'in_progress';
   const isQuotePaymentLocked = Boolean(linkedQuote) && !canPayQuote && !isQuoteAlreadyPaid;
@@ -310,21 +278,6 @@ const PaymentPage = () => {
     setPaymentMethod(method);
     setPaymentError('');
     setFieldErrors({});
-  };
-
-  const applyTestCard = (testCard) => {
-    setPaymentMethod('card');
-    setPaymentError('');
-    setFieldErrors({});
-    setPaymentForm((prev) => ({
-      ...prev,
-      cardholderName: isValidCardholderName(prev.cardholderName)
-        ? prev.cardholderName
-        : testCard.cardholderName,
-      cardNumber: formatCardNumber(testCard.cardNumber),
-      expiry: testCardExpiry,
-      cvc: testCard.cvc
-    }));
   };
 
   const validatePaymentForm = () => {
@@ -803,24 +756,6 @@ const PaymentPage = () => {
 
                 {paymentMethod === 'card' ? (
                   <div className="payment-form-grid">
-                    <div className="payment-field payment-field--full">
-                      <span>Cartes de test</span>
-                      <div className="payment-test-cards">
-                        {TEST_CARD_OPTIONS.map((testCard) => (
-                          <button
-                            key={testCard.id}
-                            type="button"
-                            className="payment-test-card"
-                            onClick={() => applyTestCard(testCard)}
-                          >
-                            <strong>{testCard.label}</strong>
-                            <span>{formatCardNumber(testCard.cardNumber)}</span>
-                            <small>Exp. {testCardExpiry} . CVC {testCard.cvc}</small>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
                     <label className="payment-field">
                       <span>Titulaire de la carte</span>
                       <input
@@ -849,13 +784,13 @@ const PaymentPage = () => {
                         className={`payment-input ${fieldErrors.cardNumber ? 'is-error' : ''}`}
                         value={paymentForm.cardNumber}
                         onChange={(event) => handleCardNumberChange(event.target.value)}
-                        placeholder="4242 4242 4242 4242"
+                        placeholder="XXXX XXXX XXXX XXXX"
                         autoComplete="cc-number"
                       />
                       <small className="payment-field__hint">
                         {cardBrand
-                          ? `Reseau detecte : ${cardBrand}. Vous pouvez aussi utiliser une carte de test ci-dessus.`
-                          : 'Les cartes plausibles sont acceptees en demo. Les suites trop suspectes comme 1111 ou 1234 sont bloquees.'}
+                          ? `Reseau detecte : ${cardBrand}. Verifiez les chiffres avant confirmation.`
+                          : 'Saisissez un numero de carte complet. Les suites trop suspectes comme 1111 ou 1234 sont bloquees.'}
                       </small>
                       {fieldErrors.cardNumber ? (
                         <small className="payment-field__error">{fieldErrors.cardNumber}</small>

@@ -247,6 +247,21 @@ class User {
     return this.findById(id);
   }
 
+  static async markEmailVerified(id) {
+    const updates = ['email_verified = TRUE'];
+
+    if (await this.hasColumn('users', 'updated_at')) {
+      updates.push('updated_at = NOW()');
+    }
+
+    const result = await database.execute(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = $1`,
+      [id]
+    );
+
+    return result.rowCount > 0;
+  }
+
   static async updatePassword(id, newPassword) {
     const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     const updates = ['password = $1', 'email_verified = $2'];
@@ -627,6 +642,73 @@ class User {
 
   static createPasswordResetTokenHash(token) {
     return createScopedHash('password-reset-token', token);
+  }
+
+  static createEmailVerificationTokenHash(token) {
+    return createScopedHash('email-verification-token', token);
+  }
+
+  static async storeEmailVerificationToken(userId, rawToken, options = {}) {
+    const expiresAt = options.expiresAt instanceof Date ? options.expiresAt : new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const tokenHash = this.createEmailVerificationTokenHash(rawToken);
+
+    await this.invalidateEmailVerificationTokens(userId);
+
+    const rows = await database.query(
+      `INSERT INTO email_verification_tokens (
+        user_id,
+        token_hash,
+        request_ip,
+        user_agent,
+        expires_at
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, expires_at`,
+      [
+        userId,
+        tokenHash,
+        normalizeText(options.ipAddress, { maxLength: 64 }) || null,
+        normalizeUserAgent(options.userAgent) || null,
+        expiresAt
+      ]
+    );
+
+    return rows[0] || null;
+  }
+
+  static async findValidEmailVerificationToken(rawToken) {
+    const rows = await database.query(
+      `SELECT *
+       FROM email_verification_tokens
+       WHERE token_hash = $1
+         AND used_at IS NULL
+         AND expires_at > NOW()
+       LIMIT 1`,
+      [this.createEmailVerificationTokenHash(rawToken)]
+    );
+
+    return rows[0] || null;
+  }
+
+  static async markEmailVerificationTokenUsed(rawToken) {
+    const result = await database.execute(
+      `UPDATE email_verification_tokens
+       SET used_at = NOW()
+       WHERE token_hash = $1
+         AND used_at IS NULL`,
+      [this.createEmailVerificationTokenHash(rawToken)]
+    );
+
+    return result.rowCount > 0;
+  }
+
+  static async invalidateEmailVerificationTokens(userId) {
+    const result = await database.execute(
+      'DELETE FROM email_verification_tokens WHERE user_id = $1 OR expires_at <= NOW()',
+      [userId]
+    );
+
+    return result.rowCount > 0;
   }
 
   static async storePasswordResetToken(userId, rawToken, options = {}) {

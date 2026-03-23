@@ -11,7 +11,7 @@ const User = require('../models/User');
 const { authenticateRequest } = require('../middleware/auth');
 const militaryJWT = require('../utils/militaryJWT');
 const securityMonitor = require('../utils/securityMonitor');
-const { sendPasswordResetEmail } = require('../utils/email');
+const { sendEmailVerificationEmail, sendPasswordResetEmail } = require('../utils/email');
 const { isValidPhone, normalizePhone } = require('../utils/phone');
 const { getAuthToken } = require('../utils/request');
 const {
@@ -57,6 +57,11 @@ const registerLimiter = createLimiter(
 const passwordResetLimiter = createLimiter(
   parseInteger(process.env.PASSWORD_RESET_RATE_LIMIT_MAX, 5),
   'Trop de demandes de reinitialisation. Reessayez plus tard.'
+);
+
+const emailVerificationLimiter = createLimiter(
+  parseInteger(process.env.EMAIL_VERIFICATION_RATE_LIMIT_MAX, 5),
+  'Trop de demandes de verification email. Reessayez plus tard.'
 );
 
 class AuthController {
@@ -118,6 +123,84 @@ class AuthController {
   static buildPasswordResetUrl(resetToken) {
     return `${this.getPasswordResetBaseUrl()}/reset-password?token=${encodeURIComponent(resetToken)}`;
   }
+
+  static getEmailVerificationBaseUrl() {
+    return normalizeText(process.env.EMAIL_VERIFICATION_BASE_URL || process.env.FRONTEND_URL, {
+      maxLength: 2048
+    }) || 'http://localhost:3000';
+  }
+
+  static getEmailVerificationExpiresInHours() {
+    return parseInteger(process.env.EMAIL_VERIFICATION_TOKEN_TTL_HOURS, 24);
+  }
+
+  static buildEmailVerificationUrl(verificationToken) {
+    return `${this.getEmailVerificationBaseUrl()}/verify-email?token=${encodeURIComponent(verificationToken)}`;
+  }
+
+  static shouldLogEmailVerificationUrl() {
+    return parseBoolean(
+      process.env.LOG_EMAIL_VERIFICATION_URLS,
+      process.env.NODE_ENV !== 'production'
+    );
+  }
+
+  static buildEmailVerificationResponseMessage({ emailDelivery, verificationUrl }) {
+    if (emailDelivery?.delivered) {
+      return 'Compte cree. Verifiez votre email avant de vous connecter.';
+    }
+
+    if (verificationUrl) {
+      return 'Compte cree. Ouvrez le lien de verification affiche dans les logs de developpement avant de vous connecter.';
+    }
+
+    return "Compte cree, mais le lien de verification n a pas pu etre envoye pour le moment. Utilisez l option de renvoi du lien plus tard ou contactez YTECH.";
+  }
+
+  static async sendEmailVerification(user, req) {
+    const verificationToken = crypto.randomBytes(48).toString('hex');
+    const expiresInHours = this.getEmailVerificationExpiresInHours();
+    const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
+    const verificationUrl = this.buildEmailVerificationUrl(verificationToken);
+
+    await User.storeEmailVerificationToken(user.id, verificationToken, {
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      expiresAt
+    });
+
+    let emailDelivery = {
+      delivered: false,
+      skipped: false
+    };
+
+    try {
+      emailDelivery = await sendEmailVerificationEmail({
+        to: user.email,
+        name: user.name,
+        verificationUrl,
+        expiresInHours
+      });
+    } catch (emailError) {
+      console.error('Erreur envoi email verification:', emailError);
+    }
+
+    const shouldLogVerificationUrl = this.shouldLogEmailVerificationUrl();
+
+    if (shouldLogVerificationUrl) {
+      console.log(
+        `Lien de verification email pour ${user.email}${emailDelivery.delivered ? ' (email envoye)' : ''}:`
+      );
+      console.log(verificationUrl);
+    }
+
+    return {
+      emailDelivery,
+      expiresInHours,
+      verificationToken: process.env.NODE_ENV === 'development' ? verificationToken : null,
+      verificationUrl: shouldLogVerificationUrl ? verificationUrl : null
+    };
+  }
 }
 
 const validateRegistrationData = (req, res, next) => {
@@ -172,7 +255,9 @@ router.post('/register', registerLimiter, validateRegistrationData, async (req, 
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        error: 'Cet email est deja utilise'
+        error: existingUser.email_verified
+          ? 'Cet email est deja utilise'
+          : 'Cet email est deja utilise. Verifiez votre boite mail ou demandez un nouveau lien de verification.'
       });
     }
 
@@ -185,11 +270,16 @@ router.post('/register', registerLimiter, validateRegistrationData, async (req, 
       role: 'client'
     });
 
-    const sessionToken = AuthController.generateSessionToken();
-    await User.createSession(user.id, sessionToken, req.ip, req.get('User-Agent'));
-    await User.markLoginSuccess(user.id);
+    const verificationDetails = await AuthController.sendEmailVerification(user, req);
 
-    return AuthController.sendAuthSuccess(res, user, sessionToken, 'Inscription reussie', 201);
+    return res.status(201).json({
+      success: true,
+      message: AuthController.buildEmailVerificationResponseMessage(verificationDetails),
+      email: user.email,
+      verificationRequired: true,
+      verificationUrl: verificationDetails.verificationUrl,
+      verificationToken: verificationDetails.verificationToken
+    });
   } catch (error) {
     console.error('Erreur inscription:', error);
     return res.status(500).json({
@@ -204,6 +294,93 @@ router.get('/csrf-token', (req, res) => {
     success: true,
     csrfToken: req.csrfToken || null
   });
+});
+
+router.get('/verify-email', emailVerificationLimiter, async (req, res) => {
+  try {
+    const token = normalizeText(req.query?.token, { maxLength: 2048 });
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Token de verification manquant'
+      });
+    }
+
+    const verificationRequest = await User.findValidEmailVerificationToken(token);
+    if (!verificationRequest?.user_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Le lien de verification est invalide ou expire',
+        code: 'EMAIL_VERIFICATION_TOKEN_INVALID'
+      });
+    }
+
+    const user = await User.findById(verificationRequest.user_id);
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: 'Compte introuvable pour cette verification'
+      });
+    }
+
+    await User.markEmailVerified(user.id);
+    await User.markEmailVerificationTokenUsed(token);
+    await User.invalidateEmailVerificationTokens(user.id);
+
+    return res.json({
+      success: true,
+      message: 'Email verifie. Vous pouvez maintenant vous connecter.',
+      email: user.email
+    });
+  } catch (error) {
+    console.error('Erreur verification email:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Une erreur est survenue. Veuillez reessayer plus tard.'
+    });
+  }
+});
+
+router.post('/resend-verification', emailVerificationLimiter, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email invalide'
+      });
+    }
+
+    const genericMessage =
+      'Si un compte non verifie existe pour cet email, un nouveau lien de verification a ete envoye.';
+    const user = await User.findByEmail(email);
+
+    if (!user || user.email_verified || !user.is_active) {
+      return res.json({
+        success: true,
+        message: genericMessage
+      });
+    }
+
+    const verificationDetails = await AuthController.sendEmailVerification(user, req);
+
+    return res.json({
+      success: true,
+      message: verificationDetails.verificationUrl
+        ? `${genericMessage} Le lien est aussi disponible dans les logs de developpement.`
+        : genericMessage,
+      verificationUrl: verificationDetails.verificationUrl,
+      verificationToken: verificationDetails.verificationToken
+    });
+  } catch (error) {
+    console.error('Erreur renvoi verification email:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Une erreur est survenue. Veuillez reessayer plus tard.'
+    });
+  }
 });
 
 router.post('/login', authLimiter, async (req, res) => {
@@ -251,6 +428,15 @@ router.post('/login', authLimiter, async (req, res) => {
         error: User.isLoginLocked(failedLoginState)
           ? 'Connexion temporairement bloquee. Reessayez plus tard.'
           : 'Email ou mot de passe incorrect'
+      });
+    }
+
+    if (!user.email_verified) {
+      return res.status(403).json({
+        success: false,
+        error: 'Veuillez verifier votre email avant de vous connecter',
+        code: 'EMAIL_NOT_VERIFIED',
+        email: user.email
       });
     }
 
@@ -389,7 +575,8 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
     return res.json({
       success: true,
       message: 'Si cet email existe, un lien de reinitialisation sera envoye',
-      resetToken: process.env.NODE_ENV === 'development' ? resetToken : null
+      resetToken: process.env.NODE_ENV === 'development' ? resetToken : null,
+      resetUrl: shouldLogResetUrl ? resetUrl : null
     });
   } catch (error) {
     console.error('Erreur forgot password:', error);

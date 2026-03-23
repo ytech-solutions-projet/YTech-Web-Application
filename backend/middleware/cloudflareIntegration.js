@@ -4,7 +4,13 @@
  */
 
 const crypto = require('crypto');
-const fetch = require('node-fetch');
+const fetch = (...args) => {
+  if (typeof globalThis.fetch === 'function') {
+    return globalThis.fetch(...args);
+  }
+
+  return import('node-fetch').then(({ default: nodeFetch }) => nodeFetch(...args));
+};
 
 class CloudflareMiddleware {
   constructor() {
@@ -199,6 +205,10 @@ class CloudflareMiddleware {
 
   // Get Cloudflare IP ranges
   async getCloudflareIPRanges() {
+    if (process.env.NODE_ENV === 'test') {
+      return [];
+    }
+
     try {
       const response = await fetch('https://www.cloudflare.com/ips-v4');
       const text = await response.text();

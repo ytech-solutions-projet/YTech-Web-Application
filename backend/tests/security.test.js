@@ -8,6 +8,7 @@ process.env.AUTH_COOKIE_SECURE = process.env.AUTH_COOKIE_SECURE || 'false';
 process.env.TRUST_PROXY = process.env.TRUST_PROXY || 'false';
 
 const request = require('supertest');
+const bcrypt = require('bcryptjs');
 const app = require('../server');
 const advancedSecurity = require('../middleware/advancedSecurity');
 const militaryJWT = require('../utils/militaryJWT');
@@ -232,43 +233,159 @@ describe('Backend security and stability', () => {
     process.env.EMAIL_FROM_ADDRESS = previousValues.EMAIL_FROM_ADDRESS;
   });
 
-  test('Registration keeps the raw password flow and creates a session', async () => {
+  test('Email verification helper skips sending when SMTP is missing', async () => {
+    const previousValues = {
+      EMAIL_HOST: process.env.EMAIL_HOST,
+      EMAIL_PORT: process.env.EMAIL_PORT,
+      EMAIL_USER: process.env.EMAIL_USER,
+      EMAIL_PASS: process.env.EMAIL_PASS,
+      EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS
+    };
+
+    delete process.env.EMAIL_HOST;
+    delete process.env.EMAIL_PORT;
+    delete process.env.EMAIL_USER;
+    delete process.env.EMAIL_PASS;
+    delete process.env.EMAIL_FROM_ADDRESS;
+
+    jest.resetModules();
+    const { sendEmailVerificationEmail } = require('../utils/email');
+
+    const result = await sendEmailVerificationEmail({
+      to: 'client@ytech.ma',
+      name: 'Client',
+      verificationUrl: 'http://localhost:3000/verify-email?token=test',
+      expiresInHours: 24
+    });
+
+    expect(result).toEqual({
+      delivered: false,
+      skipped: true,
+      reason: 'missing_email_configuration'
+    });
+
+    process.env.EMAIL_HOST = previousValues.EMAIL_HOST;
+    process.env.EMAIL_PORT = previousValues.EMAIL_PORT;
+    process.env.EMAIL_USER = previousValues.EMAIL_USER;
+    process.env.EMAIL_PASS = previousValues.EMAIL_PASS;
+    process.env.EMAIL_FROM_ADDRESS = previousValues.EMAIL_FROM_ADDRESS;
+  });
+
+  test('Registration keeps the raw password flow and requires email verification before login', async () => {
     const agent = request.agent(app);
     const csrfResponse = await agent
       .get('/api/auth/csrf-token')
       .set('Origin', 'http://localhost:3000');
 
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
     jest.spyOn(User, 'findByEmail').mockResolvedValue(null);
     const createSpy = jest.spyOn(User, 'create').mockResolvedValue({
       id: 101,
-      name: 'Client Test',
+      name: "Meryem O'Connor",
       email: 'client@test.ma',
       role: 'client',
-      is_active: true
+      is_active: true,
+      email_verified: false
     });
-    jest.spyOn(User, 'createSession').mockResolvedValue({ id: 1 });
-    jest.spyOn(User, 'markLoginSuccess').mockResolvedValue(true);
-    jest.spyOn(militaryJWT, 'generateSecureToken').mockReturnValue('signed-test-token');
+    const storeEmailVerificationTokenSpy = jest
+      .spyOn(User, 'storeEmailVerificationToken')
+      .mockResolvedValue({ id: 1 });
+    const createSessionSpy = jest.spyOn(User, 'createSession').mockResolvedValue({ id: 1 });
+    const markLoginSuccessSpy = jest.spyOn(User, 'markLoginSuccess').mockResolvedValue(true);
 
     const response = await agent
       .post('/api/auth/register')
       .set('Origin', 'http://localhost:3000')
       .set('X-CSRF-Token', csrfResponse.body.csrfToken)
       .send({
-        name: 'Client Test',
+        name: "Meryem O'Connor",
         email: 'client@test.ma',
         phone: '+212600000000',
-        company: 'YTECH',
+        company: 'YTECH & Co',
         password: 'MotDePasse#2026'
       });
 
     expect(response.status).toBe(201);
+    expect(response.body.verificationRequired).toBe(true);
+    expect(response.body.email).toBe('client@test.ma');
     expect(createSpy).toHaveBeenCalledWith(
       expect.objectContaining({
+        name: "Meryem O'Connor",
+        phone: '+212600000000',
         password: 'MotDePasse#2026'
       })
     );
     expect(createSpy.mock.calls[0][0].password).not.toMatch(/^\$2[aby]\$/);
+    expect(storeEmailVerificationTokenSpy).toHaveBeenCalledWith(
+      101,
+      expect.any(String),
+      expect.objectContaining({
+        ipAddress: expect.any(String),
+        expiresAt: expect.any(Date)
+      })
+    );
+    expect(createSessionSpy).not.toHaveBeenCalled();
+    expect(markLoginSuccessSpy).not.toHaveBeenCalled();
+  });
+
+  test('Login refuses access when the email is not verified', async () => {
+    const agent = request.agent(app);
+    const csrfResponse = await agent
+      .get('/api/auth/csrf-token')
+      .set('Origin', 'http://localhost:3000');
+
+    const passwordHash = await bcrypt.hash('MotDePasse#2026', 4);
+
+    jest.spyOn(User, 'findByEmail').mockResolvedValue({
+      id: 201,
+      email: 'client@test.ma',
+      password: passwordHash,
+      role: 'client',
+      is_active: true,
+      email_verified: false,
+      failed_login_attempts: 0,
+      locked_until: null
+    });
+
+    const createSessionSpy = jest.spyOn(User, 'createSession').mockResolvedValue({ id: 1 });
+    const markLoginSuccessSpy = jest.spyOn(User, 'markLoginSuccess').mockResolvedValue(true);
+
+    const response = await agent
+      .post('/api/auth/login')
+      .set('Origin', 'http://localhost:3000')
+      .set('X-CSRF-Token', csrfResponse.body.csrfToken)
+      .send({
+        email: 'client@test.ma',
+        password: 'MotDePasse#2026'
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe('EMAIL_NOT_VERIFIED');
+    expect(createSessionSpy).not.toHaveBeenCalled();
+    expect(markLoginSuccessSpy).not.toHaveBeenCalled();
+  });
+
+  test('Email verification endpoint marks the user as verified', async () => {
+    jest.spyOn(User, 'findValidEmailVerificationToken').mockResolvedValue({
+      user_id: 301
+    });
+    jest.spyOn(User, 'findById').mockResolvedValue({
+      id: 301,
+      email: 'client@test.ma'
+    });
+    const markEmailVerifiedSpy = jest.spyOn(User, 'markEmailVerified').mockResolvedValue(true);
+    const markTokenUsedSpy = jest.spyOn(User, 'markEmailVerificationTokenUsed').mockResolvedValue(true);
+    const invalidateTokensSpy = jest.spyOn(User, 'invalidateEmailVerificationTokens').mockResolvedValue(true);
+
+    const response = await request(app)
+      .get('/api/auth/verify-email?token=verification-token')
+      .set('Origin', 'http://localhost:3000');
+
+    expect(response.status).toBe(200);
+    expect(response.body.email).toBe('client@test.ma');
+    expect(markEmailVerifiedSpy).toHaveBeenCalledWith(301);
+    expect(markTokenUsedSpy).toHaveBeenCalledWith('verification-token');
+    expect(invalidateTokensSpy).toHaveBeenCalledWith(301);
   });
 
   test('Logout invalidates the server session before revoking the token', async () => {

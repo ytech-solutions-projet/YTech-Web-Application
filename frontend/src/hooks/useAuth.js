@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchJson } from '../utils/http';
-import { clearAuthSession, writeAuthSession } from '../utils/storage';
+import { clearAuthSession, removeStorageKey, writeAuthSession } from '../utils/storage';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -59,6 +59,7 @@ export const useAuth = () => {
         console.warn("Impossible de notifier la deconnexion cote serveur.", error);
       });
       clearAuthSession();
+      removeStorageKey('ytech-quote-draft');
       setUser(null);
       setIsAuthenticated(false);
       navigate('/login');

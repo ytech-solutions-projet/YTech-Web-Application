@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const slowDown = require('express-slow-down');
 const crypto = require('crypto');
 const validator = require('validator');
+const xss = require('xss');
 
 class OWASPSecurityMiddleware {
   constructor() {
@@ -29,7 +30,7 @@ class OWASPSecurityMiddleware {
       // A03: Injection
       injection: {
         maxInputLength: 1000,
-        allowedChars: /^[a-zA-Z0-9\s\-_.,@#$%^&*()[\]{}|\\:"'<>?/~`]+$/,
+        allowedChars: /^[^\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]*$/u,
       },
       
       // A04: Insecure Design
@@ -163,13 +164,24 @@ class OWASPSecurityMiddleware {
   // A03: Injection Prevention
   createInjectionPreventionMiddleware() {
     return (req, res, next) => {
+      const createClientError = (error, errorCode) => {
+        const validationError = new Error(error);
+        validationError.status = 400;
+        validationError.payload = {
+          success: false,
+          error,
+          errorCode
+        };
+        return validationError;
+      };
+
       const sanitizeInput = (input) => {
         if (typeof input !== 'string') return input;
         
         // Check for SQL injection patterns
         const sqlPatterns = [
-          /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b)/i,
-          /(--|\*\/|\/\*|;|'|"/,
+          /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b\s+(FROM|INTO|TABLE|DATABASE|VALUES|SET|ALL|SELECT)\b/i,
+          /(--|\*\/|\/\*)/,
           /(\b(OR|AND)\s+\d+\s*=\s*\d+)/i,
           /(\b(OR|AND)\s+['"]?\w+['"]?\s*=\s*['"]?\w+['"]?)/i
         ];
@@ -186,7 +198,7 @@ class OWASPSecurityMiddleware {
         
         // Check for command injection
         const cmdPatterns = [
-          /(;|\||&|`|\$\(|\$\{)/,
+          /(;|\||`|\$\(|\$\{)/,
           /(rm\s+-rf|mv\s+|cp\s+|cat\s+|ls\s+)/,
           /(wget|curl|nc|netcat)/,
           /(\.\.\/|\.\.\\)/
@@ -204,34 +216,22 @@ class OWASPSecurityMiddleware {
               pattern: pattern.toString(),
               timestamp: new Date().toISOString()
             });
-            
-            return res.status(400).json({
-              success: false,
-              error: 'Invalid input detected',
-              errorCode: 'INJECTION_ATTEMPT'
-            });
+
+            throw createClientError('Invalid input detected', 'INJECTION_ATTEMPT');
           }
         }
         
         // Length validation
         if (input.length > this.securityConfig.injection.maxInputLength) {
-          return res.status(400).json({
-            success: false,
-            error: 'Input too long',
-            errorCode: 'INPUT_TOO_LONG'
-          });
+          throw createClientError('Input too long', 'INPUT_TOO_LONG');
         }
         
         // Character validation
         if (!this.securityConfig.injection.allowedChars.test(input)) {
-          return res.status(400).json({
-            success: false,
-            error: 'Invalid characters detected',
-            errorCode: 'INVALID_CHARACTERS'
-          });
+          throw createClientError('Invalid characters detected', 'INVALID_CHARACTERS');
         }
-        
-        return validator.escape(input);
+
+        return xss(input.replace(/\0/g, '').trim());
       };
       
       // Sanitize all inputs
@@ -248,11 +248,19 @@ class OWASPSecurityMiddleware {
         return obj;
       };
       
-      if (req.body) req.body = sanitizeObject(req.body);
-      if (req.query) req.query = sanitizeObject(req.query);
-      if (req.params) req.params = sanitizeObject(req.params);
-      
-      next();
+      try {
+        if (req.body) req.body = sanitizeObject(req.body);
+        if (req.query) req.query = sanitizeObject(req.query);
+        if (req.params) req.params = sanitizeObject(req.params);
+
+        next();
+      } catch (error) {
+        if (error?.status === 400 && error?.payload) {
+          return res.status(error.status).json(error.payload);
+        }
+
+        return next(error);
+      }
     };
   }
 
