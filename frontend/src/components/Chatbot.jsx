@@ -6,6 +6,7 @@ import {
   getWelcomeReply,
   resolveChatbotReply
 } from '../utils/chatbotEngine';
+import { requestChatbotReply } from '../utils/chatbotApi';
 
 const createMessage = (text, sender, metadata = {}) => ({
   id: `${sender}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -22,6 +23,7 @@ const Chatbot = () => {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const timeoutRef = useRef(null);
+  const requestSequenceRef = useRef(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,6 +42,8 @@ const Chatbot = () => {
     ]);
 
     return () => {
+      requestSequenceRef.current += 1;
+
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -50,7 +54,7 @@ const Chatbot = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping, isOpen]);
 
-  const submitMessage = (rawMessage) => {
+  const submitMessage = async (rawMessage) => {
     const trimmedMessage = rawMessage.trim();
 
     if (!trimmedMessage || isTyping) {
@@ -59,6 +63,9 @@ const Chatbot = () => {
 
     const userMessage = createMessage(trimmedMessage, 'user');
     const conversationHistory = [...messages, userMessage];
+    const fallbackReply = resolveChatbotReply(trimmedMessage, conversationHistory);
+    const requestId = requestSequenceRef.current + 1;
+    requestSequenceRef.current = requestId;
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage('');
     setIsTyping(true);
@@ -67,16 +74,50 @@ const Chatbot = () => {
       clearTimeout(timeoutRef.current);
     }
 
-    timeoutRef.current = setTimeout(() => {
-      const reply = resolveChatbotReply(trimmedMessage, conversationHistory);
-      const botResponse = createMessage(reply.text, 'bot', {
-        topic: reply.topic,
-        actions: reply.actions || [],
-        serviceId: reply.serviceId || null
+    try {
+      const [remoteReply] = await Promise.all([
+        requestChatbotReply(trimmedMessage, conversationHistory),
+        new Promise((resolve) => {
+          timeoutRef.current = setTimeout(resolve, Math.min(1100, Math.max(360, trimmedMessage.length * 14)));
+        })
+      ]);
+
+      if (requestSequenceRef.current !== requestId) {
+        return;
+      }
+
+      const botResponse = createMessage(remoteReply.reply || fallbackReply.text, 'bot', {
+        topic: fallbackReply.topic,
+        actions: fallbackReply.actions || [],
+        serviceId: fallbackReply.serviceId || null,
+        provider: remoteReply.provider || 'ollama',
+        providerLabel: remoteReply.providerLabel || 'Ollama local',
+        model: remoteReply.model || '',
+        fallbackUsed: Boolean(remoteReply.fallback)
       });
+
       setMessages((prev) => [...prev, botResponse]);
-      setIsTyping(false);
-    }, Math.min(1500, Math.max(520, trimmedMessage.length * 18)));
+    } catch (error) {
+      if (requestSequenceRef.current !== requestId) {
+        return;
+      }
+
+      const botResponse = createMessage(fallbackReply.text, 'bot', {
+        topic: fallbackReply.topic,
+        actions: fallbackReply.actions || [],
+        serviceId: fallbackReply.serviceId || null,
+        provider: 'rule-based',
+        providerLabel: 'Mode secours local',
+        model: '',
+        fallbackUsed: true
+      });
+
+      setMessages((prev) => [...prev, botResponse]);
+    } finally {
+      if (requestSequenceRef.current === requestId) {
+        setIsTyping(false);
+      }
+    }
   };
 
   const handleSendMessage = () => {
@@ -139,7 +180,7 @@ const Chatbot = () => {
               <span className="chatbot-header__eyebrow">Assistant YTECH</span>
               <h2 className="chatbot-header__title">Questions sur votre projet et le site</h2>
               <p className="chatbot-header__text">
-                Services, devis, paiement, suivi, messagerie et contact.
+                IA locale gratuite si disponible, sinon mode secours local.
               </p>
             </div>
 
@@ -161,6 +202,12 @@ const Chatbot = () => {
               >
                 <div className="chatbot-bubble">
                   <div className="chatbot-bubble__text">{message.text}</div>
+                  {message.sender === 'bot' && message.providerLabel ? (
+                    <div className="chatbot-bubble__meta">
+                      {message.providerLabel}
+                      {message.model ? ` · ${message.model}` : ''}
+                    </div>
+                  ) : null}
                   {message.sender === 'bot' && Array.isArray(message.actions) && message.actions.length > 0 ? (
                     <div className="chatbot-bubble__actions">
                       {message.actions.map((action) => (

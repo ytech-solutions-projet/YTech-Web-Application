@@ -178,6 +178,14 @@
   font-size: 0.93rem;
 }
 
+.chatbot-bubble__meta {
+  margin-top: 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  opacity: 0.76;
+}
+
 .chatbot-bubble__actions {
   display: flex;
   flex-wrap: wrap;

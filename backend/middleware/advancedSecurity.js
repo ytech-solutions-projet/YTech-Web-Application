@@ -17,6 +17,8 @@ try {
 const RedisStore = redisStoreModule
   ? redisStoreModule.RedisStore || redisStoreModule.default || redisStoreModule
   : null;
+const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 const getFetch = async () => {
   if (typeof fetch === 'function') {
     return fetch;
@@ -163,6 +165,7 @@ class AdvancedSecurityMiddleware {
       windowMs: 15 * 60 * 1000,
       max: 5,
       keyGenerator: (req) => req.ip + ':' + req.path,
+      skip: (req) => SAFE_HTTP_METHODS.has(`${req.method || 'GET'}`.toUpperCase()),
       message: {
         success: false,
         error: 'Too many failed attempts. Account temporarily locked.',

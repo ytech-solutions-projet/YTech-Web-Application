@@ -18,6 +18,7 @@ const userRoutes = require('./routes/user');
 const contactRoutes = require('./routes/contact');
 const quoteRoutes = require('./routes/quotes');
 const messageRoutes = require('./routes/messages');
+const chatbotRoutes = require('./routes/chatbot');
 const { csrfProtection } = require('./middleware/security');
 const advancedSecurity = require('./middleware/advancedSecurity');
 const owaspSecurity = require('./middleware/owaspSecurity');
@@ -308,6 +309,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // Security testing endpoint
 app.use(securityTesting.createAutomatedSecurityTestingMiddleware());
