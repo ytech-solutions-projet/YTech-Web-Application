@@ -308,6 +308,12 @@ describe('Backend security and stability', () => {
     expect(response.status).toBe(201);
     expect(response.body.verificationRequired).toBe(true);
     expect(response.body.email).toBe('client@test.ma');
+    expect(response.body.verificationExpiresInHours).toBeGreaterThan(0);
+    expect(response.body.emailDelivery).toEqual({
+      delivered: false,
+      skipped: true,
+      reason: 'missing_email_configuration'
+    });
     expect(createSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "Meryem O'Connor",

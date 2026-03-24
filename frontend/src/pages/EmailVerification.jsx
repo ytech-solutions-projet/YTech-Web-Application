@@ -8,6 +8,25 @@ import '../styles/auth.css';
 
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(`${value ?? ''}`.trim());
 
+const formatExpiryNotice = (hours) => {
+  const parsedHours = Number(hours);
+
+  if (!Number.isFinite(parsedHours) || parsedHours <= 0) {
+    return '';
+  }
+
+  return `Le lien expire dans ${parsedHours} heure${parsedHours > 1 ? 's' : ''}.`;
+};
+
+const buildRegistrationNotice = ({ email, registrationMessage, emailDelivery, expiresInHours }) => {
+  if (emailDelivery?.delivered && email) {
+    const expiryNotice = formatExpiryNotice(expiresInHours);
+    return [ `Un email de verification a ete envoye a ${email}.`, expiryNotice ].filter(Boolean).join(' ');
+  }
+
+  return registrationMessage || '';
+};
+
 const EmailVerification = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -21,6 +40,10 @@ const EmailVerification = () => {
   const [resendError, setResendError] = useState('');
   const [resendMessage, setResendMessage] = useState('');
   const [isResending, setIsResending] = useState(false);
+  const [registrationMessage] = useState(location.state?.registrationMessage || '');
+  const [emailDelivery] = useState(location.state?.emailDelivery || null);
+  const [verificationExpiresInHours] = useState(location.state?.verificationExpiresInHours || null);
+  const [justRegistered] = useState(Boolean(location.state?.justRegistered));
   const [devVerificationUrl, setDevVerificationUrl] = useState(
     location.state?.devVerificationUrl || ''
   );
@@ -115,6 +138,15 @@ const EmailVerification = () => {
   loginParams.set('next', nextPath);
   const loginPath = `/login?${loginParams.toString()}`;
   const showResendForm = verificationState !== 'success';
+  const registrationNotice =
+    !token && justRegistered
+      ? buildRegistrationNotice({
+          email: verifiedEmail || resendEmail,
+          registrationMessage,
+          emailDelivery,
+          expiresInHours: verificationExpiresInHours
+        })
+      : '';
 
   return (
     <div className="marketing-page auth-page">
@@ -179,6 +211,7 @@ const EmailVerification = () => {
                 <div className="marketing-alert">Verification en cours...</div>
               ) : null}
 
+              {registrationNotice ? <div className="marketing-alert">{registrationNotice}</div> : null}
               {verificationMessage ? <div className="marketing-alert">{verificationMessage}</div> : null}
 
               {devVerificationUrl ? (

@@ -147,14 +147,22 @@ class AuthController {
 
   static buildEmailVerificationResponseMessage({ emailDelivery, verificationUrl }) {
     if (emailDelivery?.delivered) {
-      return 'Compte cree. Verifiez votre email avant de vous connecter.';
+      return 'Compte cree. Un email de verification a ete envoye. Verifiez votre email avant de vous connecter.';
     }
 
     if (verificationUrl) {
-      return 'Compte cree. Ouvrez le lien de verification affiche dans les logs de developpement avant de vous connecter.';
+      return 'Compte cree. Ouvrez le lien de verification affiche sur la page de verification avant de vous connecter.';
     }
 
     return "Compte cree, mais le lien de verification n a pas pu etre envoye pour le moment. Utilisez l option de renvoi du lien plus tard ou contactez YTECH.";
+  }
+
+  static serializeEmailDelivery(emailDelivery = {}) {
+    return {
+      delivered: Boolean(emailDelivery?.delivered),
+      skipped: Boolean(emailDelivery?.skipped),
+      reason: normalizeText(emailDelivery?.reason, { maxLength: 120 }) || ''
+    };
   }
 
   static async sendEmailVerification(user, req) {
@@ -277,6 +285,8 @@ router.post('/register', registerLimiter, validateRegistrationData, async (req, 
       message: AuthController.buildEmailVerificationResponseMessage(verificationDetails),
       email: user.email,
       verificationRequired: true,
+      verificationExpiresInHours: verificationDetails.expiresInHours,
+      emailDelivery: AuthController.serializeEmailDelivery(verificationDetails.emailDelivery),
       verificationUrl: verificationDetails.verificationUrl,
       verificationToken: verificationDetails.verificationToken
     });
@@ -368,9 +378,7 @@ router.post('/resend-verification', emailVerificationLimiter, async (req, res) =
 
     return res.json({
       success: true,
-      message: verificationDetails.verificationUrl
-        ? `${genericMessage} Le lien est aussi disponible dans les logs de developpement.`
-        : genericMessage,
+      message: genericMessage,
       verificationUrl: verificationDetails.verificationUrl,
       verificationToken: verificationDetails.verificationToken
     });

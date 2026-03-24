@@ -33,7 +33,8 @@ const Chatbot = () => {
         'bot',
         {
           topic: welcomeReply.topic,
-          actions: welcomeReply.actions || []
+          actions: welcomeReply.actions || [],
+          serviceId: welcomeReply.serviceId || null
         }
       )
     ]);
@@ -70,7 +71,8 @@ const Chatbot = () => {
       const reply = resolveChatbotReply(trimmedMessage, conversationHistory);
       const botResponse = createMessage(reply.text, 'bot', {
         topic: reply.topic,
-        actions: reply.actions || []
+        actions: reply.actions || [],
+        serviceId: reply.serviceId || null
       });
       setMessages((prev) => [...prev, botResponse]);
       setIsTyping(false);
@@ -214,7 +216,7 @@ const Chatbot = () => {
               value={inputMessage}
               onChange={(event) => setInputMessage(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Tapez votre message..."
+              placeholder="Decrivez votre besoin ou votre question..."
               className="chatbot-input__field"
             />
             <button
