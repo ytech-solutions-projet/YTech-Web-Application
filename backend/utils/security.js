@@ -1,6 +1,10 @@
 const crypto = require('crypto');
 
-const DEFAULT_ALLOWED_DEV_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+const DEFAULT_ALLOWED_DEV_ORIGINS = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://192.168.10.41:3000'
+];
 const MIN_SECRET_LENGTH = 32;
 const MIN_PASSWORD_LENGTH = 12;
 const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

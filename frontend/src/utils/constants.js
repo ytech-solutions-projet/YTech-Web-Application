@@ -3,7 +3,7 @@ export const APP_CONFIG = {
   version: process.env.REACT_APP_VERSION || '1.0.0',
   environment: process.env.REACT_APP_ENV || 'development',
   apiBaseUrl: process.env.REACT_APP_API_URL || '',
-  websocketUrl: process.env.REACT_APP_WS_URL || 'ws://localhost:5001'
+  websocketUrl: process.env.REACT_APP_WS_URL || 'ws://192.168.10.41:5001'
 };
 
 export const ROUTES = {
@@ -92,31 +92,31 @@ export const SERVICES = [
   {
     id: 'site-vitrine',
     name: 'Site Vitrine',
-    description: 'Présence professionnelle pour votre entreprise',
+    description: 'Presence professionnelle pour votre entreprise',
     priceRange: '5 000 - 15 000 DH'
   },
   {
     id: 'portfolio',
-    name: 'Portfolio Créatif',
-    description: 'Mettez en valeur vos réalisations',
+    name: 'Portfolio Creatif',
+    description: 'Mettez en valeur vos realisations',
     priceRange: '3 000 - 10 000 DH'
   },
   {
     id: 'web-application',
     name: 'Application Web Sur Mesure',
-    description: 'Solution personnalisée pour vos besoins',
+    description: 'Solution personnalisee pour vos besoins',
     priceRange: '20 000 - 80 000 DH'
   },
   {
     id: 'seo-marketing',
     name: 'SEO & Marketing Digital',
-    description: 'Optimisez votre visibilité en ligne',
+    description: 'Optimisez votre visibilite en ligne',
     priceRange: '2 000 - 10 000 DH/mois'
   },
   {
     id: 'maintenance',
     name: 'Maintenance & Support',
-    description: 'Support technique et mises à jour continues',
+    description: 'Support technique et mises a jour continues',
     priceRange: '1 000 - 5 000 DH/mois'
   }
 ];

@@ -64,7 +64,12 @@ const CSP_DIRECTIVES = {
 };
 
 if (!IS_PRODUCTION) {
-  CSP_CONNECT_SOURCES.push(...ALLOWED_ORIGINS, 'ws://localhost:3000', 'ws://127.0.0.1:3000');
+  CSP_CONNECT_SOURCES.push(
+    ...ALLOWED_ORIGINS,
+    'ws://localhost:3000',
+    'ws://127.0.0.1:3000',
+    'ws://192.168.10.41:3000'
+  );
 }
 
 CSP_DIRECTIVES.connectSrc = [...new Set(CSP_CONNECT_SOURCES)];
@@ -358,6 +363,7 @@ async function startServer() {
 
     // Démarrage du serveur
     serverInstance = app.listen(PORT, () => {
+      const publicApiUrl = `http://192.168.10.41:${PORT}`;
       console.log('YTECH Server Started Successfully');
       console.log('=====================================');
       console.log(`Port: ${PORT}`);
@@ -366,10 +372,10 @@ async function startServer() {
       console.log(
         `Admin Seed: ${adminSeed?.email || 'admin@ytech.ma'} (${adminSeed?.created ? 'created' : 'updated'})`
       );
-      console.log(`API: http://localhost:${PORT}`);
+      console.log(`API: ${publicApiUrl}`);
       console.log('=====================================');
       console.log('Development Mode Active');
-      console.log(`Health Check: http://localhost:${PORT}/api/health`);
+      console.log(`Health Check: ${publicApiUrl}/api/health`);
       console.log('=====================================');
       console.log(' Military Grade Security: ENABLED');
       console.log(` Runtime Services: ${runtimeServices.length > 0 ? 'ACTIVE' : 'DISABLED'}`);

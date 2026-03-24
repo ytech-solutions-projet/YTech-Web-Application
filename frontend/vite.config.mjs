@@ -3,6 +3,8 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const DEV_SERVER_HOST = '192.168.10.41';
+
 const packageJson = JSON.parse(
   readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8')
 );
@@ -14,7 +16,7 @@ export default defineConfig(({ mode }) => {
     REACT_APP_VERSION: env.REACT_APP_VERSION || packageJson.version,
     REACT_APP_ENV: env.REACT_APP_ENV || mode,
     REACT_APP_API_URL: env.REACT_APP_API_URL || '',
-    REACT_APP_WS_URL: env.REACT_APP_WS_URL || 'ws://localhost:5001',
+    REACT_APP_WS_URL: env.REACT_APP_WS_URL || `ws://${DEV_SERVER_HOST}:5001`,
     REACT_APP_CSRF_COOKIE_NAME: env.REACT_APP_CSRF_COOKIE_NAME || 'ytech_csrf'
   };
 
@@ -29,7 +31,7 @@ export default defineConfig(({ mode }) => {
       port: Number(env.PORT || 3000),
       proxy: {
         '/api': {
-          target: env.VITE_DEV_PROXY_TARGET || 'http://localhost:5001',
+          target: env.VITE_DEV_PROXY_TARGET || `http://${DEV_SERVER_HOST}:5001`,
           changeOrigin: true
         }
       }

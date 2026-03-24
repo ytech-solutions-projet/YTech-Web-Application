@@ -113,7 +113,7 @@ class AuthController {
   static getPasswordResetBaseUrl() {
     return normalizeText(process.env.PASSWORD_RESET_BASE_URL || process.env.FRONTEND_URL, {
       maxLength: 2048
-    }) || 'http://localhost:3000';
+    }) || 'http://192.168.10.41:3000';
   }
 
   static getPasswordResetExpiresInMinutes() {
@@ -127,7 +127,7 @@ class AuthController {
   static getEmailVerificationBaseUrl() {
     return normalizeText(process.env.EMAIL_VERIFICATION_BASE_URL || process.env.FRONTEND_URL, {
       maxLength: 2048
-    }) || 'http://localhost:3000';
+    }) || 'http://192.168.10.41:3000';
   }
 
   static getEmailVerificationExpiresInHours() {
