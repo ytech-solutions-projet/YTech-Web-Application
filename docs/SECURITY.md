@@ -18,13 +18,13 @@ YTECH Web Application implements **military-grade security standards** designed 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    SECURITY LAYERS                           │
+│                    SECURITY LAYERS                          │
 ├─────────────────────────────────────────────────────────────┤
-│ 1. Network Security     - DDoS Protection                │
-│ 2. Application Security - Rate Limiting, CSRF, XSS         │
-│ 3. Authentication        - Military JWT, Session Mgmt     │
-│ 4. Data Security        - Encryption, Hashing              │
-│ 5. Monitoring           - Real-time Threat Detection       │
+│ 1. Network Security     - DDoS Protection                   │
+│ 2. Application Security - Rate Limiting, CSRF, XSS          │
+│ 3. Authentication        - Military JWT, Session Mgmt       │
+│ 4. Data Security        - Encryption, Hashing               │
+│ 5. Monitoring           - Real-time Threat Detection        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
