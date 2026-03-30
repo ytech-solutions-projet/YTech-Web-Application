@@ -1,43 +1,43 @@
 # YTECH Deployment Guide
 
-Ce projet est maintenant pense en priorite pour cette architecture:
+Ce projet est désormais pensé en priorité pour cette architecture :
 
 - serveur web/app Ubuntu
-- frontend build statique servi par Nginx
-- backend Node.js sur le meme serveur web
-- PostgreSQL sur un autre serveur, accessible via reseau prive ou regles firewall strictes
-- serveur web avec 2 interfaces/IP:
+- build statique du frontend servi par Nginx
+- backend Node.js sur le même serveur web
+- PostgreSQL sur un autre serveur, accessible via un réseau privé ou des règles de pare-feu strictes
+- serveur web avec 2 interfaces/IP :
 - une IP bridge ou publique pour les utilisateurs
-- une IP privee pour parler au serveur PostgreSQL
+- une IP privée pour communiquer avec le serveur PostgreSQL
 - serveur PostgreSQL avec IP fixe
 
-## Architecture recommandee
+## Architecture recommandée
 
 ```text
 Internet
   |
   v
-Nginx (Ubuntu web server - public/bridge IP)
-  |- /           -> frontend build
+Nginx (serveur Ubuntu web - IP publique/bridge)
+  |- /           -> build frontend
   |- /api        -> backend Node.js (127.0.0.1:5001)
   |
   v
-PostgreSQL remote server (fixed private IP, ex: 10.10.10.3:5432)
+Serveur PostgreSQL distant (IP privée fixe, ex. : 10.10.10.3:5432)
 ```
 
-## Hypotheses de production
+## Hypothèses de production
 
-- le backend ecoute en local sur `127.0.0.1:5001`
+- le backend écoute en local sur `127.0.0.1:5001`
 - Nginx expose publiquement le site et reverse-proxy `/api`
-- la base n est pas sur le meme serveur que l application
-- le serveur web dispose d une interface/IP publique et d une interface/IP privee
-- la connexion PostgreSQL sort par l interface/IP privee du serveur web
-- les URLs publiques sont definies par variables d environnement
-- les cookies securises sont utilises en HTTPS
+- la base n’est pas sur le même serveur que l’application
+- le serveur web dispose d’une interface/IP publique et d’une interface/IP privée
+- la connexion PostgreSQL sort par l’interface/IP privée du serveur web
+- les URL publiques sont définies par des variables d’environnement
+- les cookies sécurisés sont utilisés en HTTPS
 
-## 1. Preparation du serveur Ubuntu web/app
+## 1. Préparation du serveur Ubuntu web/app
 
-Installer les composants principaux:
+Installer les composants principaux :
 
 ```bash
 sudo apt update
@@ -46,7 +46,7 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-Verifications:
+Vérifications :
 
 ```bash
 node -v
@@ -54,7 +54,7 @@ npm -v
 nginx -v
 ```
 
-## 2. Preparation du depot
+## 2. Préparation du dépôt
 
 ```bash
 cd /var/www
@@ -65,9 +65,9 @@ cd /var/www/ytech
 
 ## 3. Configuration backend
 
-Le fichier modele est `backend/.env.production.example`.
+Le fichier modèle est `backend/.env.production.example`.
 
-Creer le vrai fichier:
+Créer le vrai fichier :
 
 ```bash
 cd /var/www/ytech/backend
@@ -75,7 +75,7 @@ cp .env.production.example .env
 nano .env
 ```
 
-Variables importantes pour une base distante:
+Variables importantes pour une base distante :
 
 ```env
 NODE_ENV=production
@@ -101,19 +101,19 @@ AUTH_COOKIE_SAME_SITE=strict
 TRUST_PROXY=true
 ```
 
-Notes:
+Notes :
 
-- `HOST=127.0.0.1` limite l acces direct au backend et laisse Nginx faire l exposition publique.
+- `HOST=127.0.0.1` limite l’accès direct au backend et laisse Nginx gérer l’exposition publique.
 - `DB_HOST` doit pointer vers le serveur PostgreSQL distant.
-- `DB_HOST` doit etre joignable depuis l interface/IP privee du serveur web, pas via l IP publique.
-- `DB_SSL=true` est recommande si la base est sur un autre serveur.
-- si ton hebergeur fournit une URL complete, tu peux utiliser `DATABASE_URL` a la place de `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`.
+- `DB_HOST` doit être joignable depuis l’interface/IP privée du serveur web, pas via l’IP publique.
+- `DB_SSL=true` est recommandé si la base est sur un autre serveur.
+- si ton hébergeur fournit une URL complète, tu peux utiliser `DATABASE_URL` à la place de `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`.
 
 ## 4. Configuration frontend
 
-Le fichier modele est `frontend/.env.production.example`.
+Le fichier modèle est `frontend/.env.production.example`.
 
-Creer le vrai fichier:
+Créer le vrai fichier :
 
 ```bash
 cd /var/www/ytech/frontend
@@ -121,25 +121,25 @@ cp .env.production.example .env
 nano .env
 ```
 
-Configuration recommandee derriere Nginx:
+Configuration recommandée derrière Nginx :
 
 ```env
 REACT_APP_ENV=production
 REACT_APP_API_URL=
 ```
 
-Laisser `REACT_APP_API_URL` vide est recommande si le frontend et l API sont servis sous le meme domaine avec `/api` reverse-proxy par Nginx.
+Laisser `REACT_APP_API_URL` vide est recommandé si le frontend et l’API sont servis sous le même domaine avec `/api` reverse-proxy par Nginx.
 
 ## 5. Installation et build
 
-Backend:
+Backend :
 
 ```bash
 cd /var/www/ytech/backend
 npm ci --omit=dev
 ```
 
-Frontend:
+Frontend :
 
 ```bash
 cd /var/www/ytech/frontend
@@ -149,7 +149,7 @@ npm run build
 
 ## 6. Service systemd backend
 
-Exemple:
+Exemple :
 
 ```ini
 [Unit]
@@ -174,7 +174,7 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-Activation:
+Activation :
 
 ```bash
 sudo systemctl daemon-reload
@@ -184,7 +184,7 @@ sudo systemctl status ytech-backend
 
 ## 7. Configuration Nginx
 
-Exemple minimal:
+Exemple minimal :
 
 ```nginx
 server {
@@ -217,23 +217,23 @@ server {
 }
 ```
 
-Validation:
+Validation :
 
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## 8. Acces reseau vers PostgreSQL
+## 8. Accès réseau vers PostgreSQL
 
-Sur le serveur base de donnees:
+Sur le serveur de base de données :
 
-- autoriser uniquement l IP privee du serveur web/app
+- autoriser uniquement l’IP privée du serveur web/app
 - restreindre le port `5432`
 - activer SSL si possible
-- creer un utilisateur dedie a l application
+- créer un utilisateur dédié à l’application
 
-Exemple conceptuel:
+Exemple conceptuel :
 
 ```text
 Web/App public IP:  192.168.1.16
@@ -242,22 +242,22 @@ DB server fixed IP: 10.10.10.3
 Rule:               allow 10.10.10.2 -> 10.10.10.3:5432
 ```
 
-## 9. Verification apres deploiement
+## 9. Vérification après déploiement
 
-Backend:
+Backend :
 
 ```bash
 curl http://127.0.0.1:5001/api/health
 ```
 
-Nginx public:
+Nginx public :
 
 ```bash
 curl -I https://app.example.com
 curl -I https://app.example.com/api/health
 ```
 
-Logs:
+Logs :
 
 ```bash
 sudo journalctl -u ytech-backend -n 100 --no-pager
@@ -265,16 +265,16 @@ sudo tail -f /var/log/nginx/access.log
 sudo tail -f /var/log/nginx/error.log
 ```
 
-## 10. Deploiement via le script fourni
+## 10. Déploiement via le script fourni
 
-Le script `deploy.sh` est aligne avec cette approche:
+Le script `deploy.sh` est aligné avec cette approche :
 
 - backend systemd
-- frontend build statique
+- build statique du frontend
 - Nginx en frontal
 - backend local sur `127.0.0.1`
 
-Sequence typique:
+Séquence typique :
 
 ```bash
 cd /var/www/ytech
@@ -284,7 +284,7 @@ sudo ./deploy.sh
 ## Points de vigilance
 
 - ne mets pas `DB_HOST=localhost` si PostgreSQL est sur un autre serveur
-- ne laisse pas d IP privee codée en dur comme URL publique
-- renseigne `FRONTEND_URL`, `PUBLIC_API_URL` et `ALLOWED_ORIGINS` avec tes vraies URLs
+- ne laisse pas d’IP privée codée en dur comme URL publique
+- renseigne `FRONTEND_URL`, `PUBLIC_API_URL` et `ALLOWED_ORIGINS` avec tes vraies URL
 - active HTTPS avant de passer `AUTH_COOKIE_SECURE=true`
-- utilise des secrets longs et differents pour `JWT_SECRET` et `SESSION_SECRET`
+- utilise des secrets longs et différents pour `JWT_SECRET` et `SESSION_SECRET`

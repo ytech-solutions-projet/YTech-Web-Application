@@ -1,0 +1,65 @@
+<svg width="1400" height="760" viewBox="0 0 1400 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="hero-bg" x1="140" y1="90" x2="1260" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1F33"/>
+      <stop offset="0.52" stop-color="#123A59"/>
+      <stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+    <linearGradient id="hero-accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#14B8A6"/>
+    </linearGradient>
+    <linearGradient id="hero-card" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1400" height="760" rx="40" fill="#F5EDE3"/>
+  <rect x="32" y="32" width="1336" height="696" rx="34" fill="url(#hero-bg)"/>
+
+  <circle cx="1130" cy="168" r="156" fill="#FFFFFF" fill-opacity="0.06"/>
+  <circle cx="1180" cy="582" r="134" fill="#F59E0B" fill-opacity="0.12"/>
+  <circle cx="930" cy="602" r="84" fill="#22D3EE" fill-opacity="0.16"/>
+
+  <rect x="96" y="92" width="178" height="42" rx="21" fill="#E2E8F0" fill-opacity="0.1"/>
+  <text x="129" y="119" fill="#7DD3FC" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="2">YTECH PLATFORM</text>
+
+  <text x="96" y="214" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="78" font-weight="700">Secure client and</text>
+  <text x="96" y="294" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="78" font-weight="700">admin operations</text>
+  <text x="96" y="364" fill="#D7E3EF" font-family="Segoe UI, Arial, sans-serif" font-size="28">Public website, client portal, admin workflows, quotes, messaging, payment</text>
+  <text x="96" y="404" fill="#D7E3EF" font-family="Segoe UI, Arial, sans-serif" font-size="28">and hardened authentication with password reset by email and settings.</text>
+
+  <rect x="96" y="468" width="182" height="48" rx="24" fill="url(#hero-accent)"/>
+  <text x="136" y="499" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">React 18 Frontend</text>
+
+  <rect x="294" y="468" width="180" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="335" y="499" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">Node.js API</text>
+
+  <rect x="490" y="468" width="178" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="530" y="499" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">PostgreSQL</text>
+
+  <rect x="684" y="468" width="178" height="48" rx="24" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="728" y="499" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">OWASP Layers</text>
+
+  <rect x="96" y="576" width="342" height="94" rx="26" fill="url(#hero-card)" stroke="#FFFFFF" stroke-opacity="0.16"/>
+  <text x="128" y="616" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">Password flows</text>
+  <text x="128" y="648" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="18">Client and admin can change passwords</text>
+  <text x="128" y="674" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="18">from settings or from a secure email link.</text>
+
+  <rect x="880" y="108" width="348" height="146" rx="30" fill="url(#hero-card)" stroke="#FFFFFF" stroke-opacity="0.16"/>
+  <text x="916" y="150" fill="#F59E0B" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="1">CLIENT SPACE</text>
+  <text x="916" y="196" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">Dashboard and tracking</text>
+  <text x="916" y="230" fill="#D7E3EF" font-family="Segoe UI, Arial, sans-serif" font-size="19">Quotes, project status, messaging and payment follow-up.</text>
+
+  <rect x="826" y="284" width="402" height="152" rx="30" fill="url(#hero-card)" stroke="#FFFFFF" stroke-opacity="0.16"/>
+  <text x="862" y="326" fill="#22D3EE" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="1">ADMIN OPS</text>
+  <text x="862" y="372" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">Operational control center</text>
+  <text x="862" y="406" fill="#D7E3EF" font-family="Segoe UI, Arial, sans-serif" font-size="19">Approve quotes, respond to messages, verify users and manage workflows.</text>
+
+  <rect x="930" y="474" width="298" height="160" rx="30" fill="#F8FAFC"/>
+  <text x="966" y="516" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="1">SECURITY STACK</text>
+  <text x="966" y="560" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">CSRF, CORS, audit logs</text>
+  <text x="966" y="594" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Session hardening, token masking,</text>
+  <text x="966" y="620" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">container updates and CI scans.</text>
+</svg>

@@ -1,0 +1,72 @@
+<svg width="1400" height="860" viewBox="0 0 1400 860" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="surface-bg" x1="70" y1="50" x2="1320" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF8F1"/>
+      <stop offset="1" stop-color="#F3E8DA"/>
+    </linearGradient>
+    <linearGradient id="surface-panel" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#0B1F33"/>
+      <stop offset="1" stop-color="#123A59"/>
+    </linearGradient>
+    <linearGradient id="surface-line" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#14B8A6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1400" height="860" rx="40" fill="url(#surface-bg)"/>
+
+  <text x="88" y="110" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="700">What the platform delivers</text>
+  <text x="88" y="152" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="22">A full-stack workflow from discovery to project execution and secured account management.</text>
+
+  <rect x="88" y="216" width="284" height="244" rx="30" fill="url(#surface-panel)"/>
+  <rect x="88" y="216" width="284" height="10" rx="5" fill="url(#surface-line)"/>
+  <text x="120" y="274" fill="#F59E0B" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">PUBLIC EXPERIENCE</text>
+  <text x="120" y="322" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Marketing pages</text>
+  <text x="120" y="360" fill="#D8E3EF" font-family="Segoe UI, Arial, sans-serif" font-size="18">Home, services, portfolio, contact and clear calls to action.</text>
+  <rect x="120" y="394" width="128" height="36" rx="18" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="151" y="417" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">React + Vite</text>
+
+  <rect x="402" y="216" width="284" height="244" rx="30" fill="#FFFFFF" stroke="#D2DCE6" stroke-width="2"/>
+  <rect x="402" y="216" width="284" height="10" rx="5" fill="#22D3EE"/>
+  <text x="434" y="274" fill="#0F766E" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">CLIENT WORKSPACE</text>
+  <text x="434" y="322" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Quotes and follow-up</text>
+  <text x="434" y="360" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Secure login, dashboard, project tracking, messages and payment journey.</text>
+  <rect x="434" y="394" width="118" height="36" rx="18" fill="#ECFEFF"/>
+  <text x="463" y="417" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Dashboard</text>
+
+  <rect x="716" y="216" width="284" height="244" rx="30" fill="#FFFFFF" stroke="#D2DCE6" stroke-width="2"/>
+  <rect x="716" y="216" width="284" height="10" rx="5" fill="#F59E0B"/>
+  <text x="748" y="274" fill="#B45309" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">ADMIN CONTROL</text>
+  <text x="748" y="322" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Moderation and ops</text>
+  <text x="748" y="360" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Quote approval, inbox handling, user verification and internal monitoring.</text>
+  <rect x="748" y="394" width="110" height="36" rx="18" fill="#FFF7ED"/>
+  <text x="779" y="417" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Admin flow</text>
+
+  <rect x="1030" y="216" width="284" height="244" rx="30" fill="url(#surface-panel)"/>
+  <rect x="1030" y="216" width="284" height="10" rx="5" fill="#FB7185"/>
+  <text x="1062" y="274" fill="#FDBA74" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">TRANSACTIONS</text>
+  <text x="1062" y="322" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Payment and receipts</text>
+  <text x="1062" y="360" fill="#D8E3EF" font-family="Segoe UI, Arial, sans-serif" font-size="18">Card and PayPal flows, payment context and downloadable proof of payment.</text>
+  <rect x="1062" y="394" width="132" height="36" rx="18" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="1094" y="417" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Payment page</text>
+
+  <rect x="88" y="520" width="1226" height="252" rx="34" fill="#FFFFFF" stroke="#D2DCE6" stroke-width="2"/>
+  <text x="126" y="580" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Cross-cutting capabilities</text>
+
+  <rect x="126" y="622" width="258" height="110" rx="24" fill="#F8FAFC"/>
+  <text x="154" y="664" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Chat assistant</text>
+  <text x="154" y="696" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">Contextual answers and guided actions directly inside the app.</text>
+
+  <rect x="414" y="622" width="258" height="110" rx="24" fill="#ECFEFF"/>
+  <text x="442" y="664" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Email workflows</text>
+  <text x="442" y="696" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">Verification emails, password reset links and account change alerts.</text>
+
+  <rect x="702" y="622" width="258" height="110" rx="24" fill="#FFF7ED"/>
+  <text x="730" y="664" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Security middleware</text>
+  <text x="730" y="696" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">Validation, CSRF, CORS, rate limits, masking and hardened cookies.</text>
+
+  <rect x="990" y="622" width="286" height="110" rx="24" fill="#F8FAFC"/>
+  <text x="1018" y="664" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Deployment ready</text>
+  <text x="1018" y="696" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">Ubuntu, Nginx, systemd, Docker and CI security scanning.</text>
+</svg>

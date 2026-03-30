@@ -1,14 +1,14 @@
 # Deployment Update
 
-Ce depot doit maintenant etre considere avec cette cible de production:
+Ce dépôt doit désormais être considéré avec cette cible de production :
 
 - serveur Ubuntu pour le frontend, Nginx et le backend Node.js
-- serveur PostgreSQL separe
-- communication backend -> PostgreSQL via reseau prive ou firewall strict
+- serveur PostgreSQL séparé
+- communication backend -> PostgreSQL via un réseau privé ou un pare-feu strict
 
 ## Rappel de configuration
 
-Backend:
+Backend :
 
 ```env
 NODE_ENV=production
@@ -28,14 +28,14 @@ DB_SSL=true
 DB_SSL_REJECT_UNAUTHORIZED=true
 ```
 
-Frontend:
+Frontend :
 
 ```env
 REACT_APP_ENV=production
 REACT_APP_API_URL=
 ```
 
-## Verification rapide
+## Vérification rapide
 
 ```bash
 curl http://127.0.0.1:5001/api/health
@@ -43,7 +43,7 @@ curl -I https://app.example.com
 curl -I https://app.example.com/api/health
 ```
 
-## Fichiers de reference
+## Fichiers de référence
 
 - `DEPLOYMENT.md`
 - `backend/.env.production.example`

@@ -1,44 +1,42 @@
-# ===============================================
-# 🗄️ PERSISTENCE DEPLOYMENT GUIDE - YTECH
-# ===============================================
+# Guide de Déploiement de la Persistance - YTECH
 
-## 📋 Vue d'ensemble
+## Vue d’ensemble
 
 Ce guide explique comment configurer et déployer le système de persistance complet pour YTECH avec sauvegarde automatique, monitoring et récupération.
 
 ---
 
-## 🏗️ Architecture de Persistance
+## Architecture de Persistance
 
-### **🗄️ Base de Données (PostgreSQL)**
-- **Persistance**: Données structurées
-- **Backup**: Automatisé tous les jours à 2h
-- **Rétention**: 30 jours
-- **Compression**: Activée
+### **Base de Données (PostgreSQL)**
+- **Persistance** : données structurées
+- **Backup** : automatisé tous les jours à 2 h
+- **Rétention** : 30 jours
+- **Compression** : activée
 
-### **🔄 Sessions (Redis)**
-- **Persistance**: Sessions utilisateur actives
-- **Sauvegarde**: Tous les 15 minutes
-- **Mode**: Append-only file
-- **Nettoyage**: Toutes les 6 heures
+### **Sessions (Redis)**
+- **Persistance** : sessions utilisateur actives
+- **Sauvegarde** : toutes les 15 minutes
+- **Mode** : append-only file
+- **Nettoyage** : toutes les 6 heures
 
-### **📁 Uploads**
-- **Persistance**: Fichiers uploadés
-- **Backup**: Quotidien à 3h
-- **Rétention**: 7 jours
-- **Validation**: Intégrité vérifiée
+### **Uploads**
+- **Persistance** : fichiers uploadés
+- **Backup** : quotidien à 3 h
+- **Rétention** : 7 jours
+- **Validation** : intégrité vérifiée
 
-### **📋 Logs**
-- **Persistance**: Logs structurés JSON
-- **Rotation**: 100MB max par fichier
-- **Compression**: Automatique
-- **Rétention**: 30 jours
+### **Logs**
+- **Persistance** : logs structurés JSON
+- **Rotation** : 100 MB max par fichier
+- **Compression** : automatique
+- **Rétention** : 30 jours
 
 ---
 
-## 🚀 Déploiement sur Ubuntu Server
+## Déploiement sur Ubuntu Server
 
-### **Étape 1: Installation des dépendances**
+### **Étape 1 : Installation des dépendances**
 
 ```bash
 # PostgreSQL
@@ -56,7 +54,7 @@ sudo apt install nodejs -y
 sudo apt install gzip tar -y
 ```
 
-### **Étape 2: Configuration PostgreSQL**
+### **Étape 2 : Configuration PostgreSQL**
 
 ```bash
 # Configuration de la base de données
@@ -74,13 +72,13 @@ sudo -u postgres psql -c "ALTER SYSTEM SET archive_command = 'cp %p /var/backups
 sudo systemctl restart postgresql
 ```
 
-### **Étape 3: Configuration Redis**
+### **Étape 3 : Configuration Redis**
 
 ```bash
-# Configuration Redis pour persistance
+# Configuration Redis pour la persistance
 sudo nano /etc/redis/redis.conf
 
-# Ajouter/modifier ces lignes:
+# Ajouter/modifier ces lignes :
 save 900 1
 save 300 10
 save 60 10000
@@ -92,7 +90,7 @@ dir /var/lib/redis
 sudo systemctl restart redis
 ```
 
-### **Étape 4: Création des répertoires de persistance**
+### **Étape 4 : Création des répertoires de persistance**
 
 ```bash
 # Répertoires principaux
@@ -108,7 +106,7 @@ sudo chown -R redis:redis /var/lib/redis
 sudo chmod -R 755 /var/backups/ytech
 ```
 
-### **Étape 5: Configuration des variables d'environnement**
+### **Étape 5 : Configuration des variables d’environnement**
 
 ```bash
 # Copie des fichiers de configuration
@@ -120,7 +118,7 @@ sudo cp .env.persistence .env.persistence
 cat .env | grep -E "(DB_|REDIS_|UPLOAD_|LOG_)"
 ```
 
-### **Étape 6: Installation des dépendances Node.js**
+### **Étape 6 : Installation des dépendances Node.js**
 
 ```bash
 cd /var/www/ytech/backend
@@ -131,7 +129,7 @@ npm install --production
 npm run build
 ```
 
-### **Étape 7: Configuration des services systemd**
+### **Étape 7 : Configuration des services systemd**
 
 ```bash
 # Service Backend
@@ -190,9 +188,9 @@ sudo systemctl start ytech-frontend
 
 ---
 
-## 📅 Configuration des Tâches Planifiées
+## Configuration des Tâches Planifiées
 
-### **Backup Automatisé**
+### **Backup automatisé**
 
 ```bash
 # Rendre le script exécutable
@@ -201,7 +199,7 @@ chmod +x /var/www/ytech/scripts/backup.sh
 # Ajouter au crontab
 sudo crontab -e
 
-# Ajouter ces lignes:
+# Ajouter ces lignes :
 0 1 * * * /var/www/ytech/scripts/backup.sh
 0 */6 * * * /var/www/ytech/backend/scripts/cleanup_sessions.sh
 0 2 * * * find /var/www/ytech/logs -name "*.log" -mtime +30 -delete
@@ -209,7 +207,7 @@ sudo crontab -e
 
 ---
 
-## 🔍 Monitoring et Vérification
+## Monitoring et Vérification
 
 ### **Vérification des services**
 
@@ -250,7 +248,7 @@ firefox https://app.example.com/monitoring/disk_space_report.html
 
 ---
 
-## 🔄 Restauration
+## Restauration
 
 ### **Restauration complète**
 
@@ -259,9 +257,9 @@ firefox https://app.example.com/monitoring/disk_space_report.html
 chmod +x /var/www/ytech/scripts/restore.sh
 sudo /var/www/ytech/scripts/restore.sh
 
-# Options disponibles:
+# Options disponibles :
 # 1) Restore PostgreSQL
-# 2) Restore Redis  
+# 2) Restore Redis
 # 3) Restore Uploads
 # 4) Restore Configuration
 # 5) Restore Complet
@@ -288,14 +286,14 @@ tar -xzf /var/backups/ytech/uploads/uploads_2026-03-22.tar.gz -C /var/www/
 
 ---
 
-## 📊 Rapports et Statistiques
+## Rapports et Statistiques
 
 ### **Rapports disponibles**
 
-- **Espace disque**: `/var/www/ytech/monitoring/disk_space_report.html`
-- **Logs**: `/var/www/ytech/logs/`
-- **Backups**: `/var/backups/ytech/`
-- **Sessions**: Redis CLI `KEYS ytech:session:*`
+- **Espace disque** : `/var/www/ytech/monitoring/disk_space_report.html`
+- **Logs** : `/var/www/ytech/logs/`
+- **Backups** : `/var/backups/ytech/`
+- **Sessions** : Redis CLI `KEYS ytech:session:*`
 
 ### **API de monitoring**
 
@@ -312,7 +310,7 @@ curl https://app.example.com/api/persistence/uploads-stats
 
 ---
 
-## 🚨 Alertes et Notifications
+## Alertes et Notifications
 
 ### **Configuration des alertes**
 
@@ -322,32 +320,32 @@ echo "DISK_ALERT_WEBHOOK=https://your-webhook-url" >> /var/www/ytech/backend/.en
 echo "SECURITY_WEBHOOK_URL=https://your-security-webhook" >> /var/www/ytech/backend/.env
 ```
 
-### **Types d'alertes**
+### **Types d’alertes**
 
-- **Espace disque critique** (>85%)
+- **Espace disque critique** (>85 %)
 - **Échec de backup**
 - **Corruption de données**
 - **Sessions anormales**
-- **Tentatives d'intrusion**
+- **Tentatives d’intrusion**
 
 ---
 
-## 🔧 Maintenance
+## Maintenance
 
 ### **Tâches de maintenance régulières**
 
 ```bash
-# Quotidien (automatique):
+# Quotidien (automatique) :
 - Backup des données
 - Nettoyage des logs
-- Monitoring espace disque
+- Monitoring de l'espace disque
 
-# Hebdomadaire:
+# Hebdomadaire :
 - Vérification de l'intégrité des backups
 - Nettoyage des fichiers temporaires
 - Analyse des performances
 
-# Mensuel:
+# Mensuel :
 - Test de restauration
 - Mise à jour des dépendances
 - Audit de sécurité
@@ -356,7 +354,7 @@ echo "SECURITY_WEBHOOK_URL=https://your-security-webhook" >> /var/www/ytech/back
 ### **Commandes de maintenance**
 
 ```bash
-# Vérification intégrité
+# Vérification d'intégrité
 /var/www/ytech/scripts/check_integrity.sh
 
 # Nettoyage manuel
@@ -368,17 +366,17 @@ echo "SECURITY_WEBHOOK_URL=https://your-security-webhook" >> /var/www/ytech/back
 
 ---
 
-## 🎯 Résultat Final
+## Résultat final
 
-Après déploiement, vous aurez:
+Après déploiement, vous aurez :
 
-✅ **Persistance complète** des données  
-✅ **Backup automatique** quotidien  
-✅ **Monitoring** en temps réel  
-✅ **Restauration** simplifiée  
-✅ **Alertes** proactives  
-✅ **Logs structurés** et persistants  
-✅ **Sessions Redis** persistantes  
-✅ **Uploads sécurisés** avec intégrité  
+- **Persistance complète** des données
+- **Backup automatique** quotidien
+- **Monitoring** en temps réel
+- **Restauration** simplifiée
+- **Alertes** proactives
+- **Logs structurés** et persistants
+- **Sessions Redis** persistantes
+- **Uploads sécurisés** avec intégrité
 
-**Le système YTECH est maintenant entièrement persistant avec une récupération garantie !** 🚀
+**Le système YTECH est maintenant entièrement persistant avec une récupération garantie.**

@@ -1,0 +1,58 @@
+<svg width="1400" height="860" viewBox="0 0 1400 860" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sec-bg" x1="80" y1="60" x2="1300" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#123A59"/>
+    </linearGradient>
+    <linearGradient id="sec-accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1400" height="860" rx="40" fill="#F5EDE3"/>
+  <rect x="32" y="32" width="1336" height="796" rx="34" fill="url(#sec-bg)"/>
+
+  <text x="90" y="118" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="700">Security and deployment posture</text>
+  <text x="90" y="160" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="22">Designed for a public web server with a private database network and layered authentication controls.</text>
+
+  <rect x="90" y="220" width="1220" height="214" rx="34" fill="#FFFFFF" fill-opacity="0.08" stroke="#FFFFFF" stroke-opacity="0.12"/>
+  <text x="126" y="278" fill="#7DD3FC" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="1">TARGET TOPOLOGY</text>
+
+  <rect x="126" y="312" width="284" height="92" rx="24" fill="#FFFFFF" fill-opacity="0.1"/>
+  <text x="156" y="348" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Public / bridge IP</text>
+  <text x="156" y="378" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="18">Users and Nginx entry point</text>
+
+  <rect x="478" y="312" width="364" height="92" rx="24" fill="#FFFFFF" fill-opacity="0.1"/>
+  <text x="510" y="348" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Ubuntu web/app server</text>
+  <text x="510" y="378" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="18">Static frontend + Nginx + backend on 127.0.0.1:5001</text>
+
+  <rect x="910" y="312" width="364" height="92" rx="24" fill="#FFFFFF" fill-opacity="0.1"/>
+  <text x="942" y="348" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Private DB network</text>
+  <text x="942" y="378" fill="#D6E2F0" font-family="Segoe UI, Arial, sans-serif" font-size="18">Fixed-IP PostgreSQL reachable only from the web server</text>
+
+  <path d="M410 358H478" stroke="url(#sec-accent)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M842 358H910" stroke="url(#sec-accent)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M447 338L478 358L447 378" fill="none" stroke="#22D3EE" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M879 338L910 358L879 378" fill="none" stroke="#F59E0B" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="90" y="496" width="282" height="252" rx="30" fill="#FFFFFF"/>
+  <text x="122" y="548" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">ACCOUNT SECURITY</text>
+  <text x="122" y="594" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Settings based password change</text>
+  <text x="122" y="634" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Client and admin can update their password from a dedicated settings page.</text>
+
+  <rect x="404" y="496" width="282" height="252" rx="30" fill="#ECFEFF"/>
+  <text x="436" y="548" fill="#0F766E" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">EMAIL FLOW</text>
+  <text x="436" y="594" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Reset links and alerts</text>
+  <text x="436" y="634" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Secure reset links, account notifications and no password reuse.</text>
+
+  <rect x="718" y="496" width="282" height="252" rx="30" fill="#FFF7ED"/>
+  <text x="750" y="548" fill="#B45309" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">REQUEST DEFENSE</text>
+  <text x="750" y="594" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">CSRF, CORS and input guards</text>
+  <text x="750" y="634" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Validated payloads, origin checks, rate limits and safer request handling.</text>
+
+  <rect x="1032" y="496" width="278" height="252" rx="30" fill="#F8FAFC"/>
+  <text x="1064" y="548" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">OPS HARDENING</text>
+  <text x="1064" y="594" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Audit logs and CI scans</text>
+  <text x="1064" y="634" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Token masking, Docker hardening, CodeQL, Semgrep and Trivy checks.</text>
+</svg>
