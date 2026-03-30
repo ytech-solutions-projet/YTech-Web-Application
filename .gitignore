@@ -335,6 +335,7 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 !frontend/package-lock.json
+!backend/package-lock.json
 
 # IDE and editor files
 .vscode/
@@ -405,6 +406,7 @@ Thumbs.db
 !.dockerignore
 !backend/.env.production.example
 !frontend/.env.production.example
+!backend/package-lock.json
 node_modules/
 frontend/build/
 frontend/dist/
