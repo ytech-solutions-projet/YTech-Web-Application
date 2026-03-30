@@ -1,10 +1,10 @@
-<svg width="1400" height="860" viewBox="0 0 1400 860" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="1400" height="900" viewBox="0 0 1400 900" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="surface-bg" x1="70" y1="50" x2="1320" y2="800" gradientUnits="userSpaceOnUse">
+    <linearGradient id="surface-bg" x1="70" y1="40" x2="1320" y2="840" gradientUnits="userSpaceOnUse">
       <stop stop-color="#FFF8F1"/>
-      <stop offset="1" stop-color="#F3E8DA"/>
+      <stop offset="1" stop-color="#F2E6D8"/>
     </linearGradient>
-    <linearGradient id="surface-panel" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="surface-dark" x1="0" y1="0" x2="1" y2="1">
       <stop stop-color="#0B1F33"/>
       <stop offset="1" stop-color="#123A59"/>
     </linearGradient>
@@ -14,59 +14,98 @@
     </linearGradient>
   </defs>
 
-  <rect width="1400" height="860" rx="40" fill="url(#surface-bg)"/>
+  <rect width="1400" height="900" rx="40" fill="url(#surface-bg)"/>
 
   <text x="88" y="110" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="700">What the platform delivers</text>
-  <text x="88" y="152" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="22">A full-stack workflow from discovery to project execution and secured account management.</text>
+  <text x="88" y="152" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="22">
+    <tspan x="88" y="152">A full-stack workflow from discovery to delivery, with clear account security</tspan>
+    <tspan x="88" y="182">and practical operations for both the client space and the admin side.</tspan>
+  </text>
 
-  <rect x="88" y="216" width="284" height="244" rx="30" fill="url(#surface-panel)"/>
-  <rect x="88" y="216" width="284" height="10" rx="5" fill="url(#surface-line)"/>
-  <text x="120" y="274" fill="#F59E0B" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">PUBLIC EXPERIENCE</text>
-  <text x="120" y="322" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Marketing pages</text>
-  <text x="120" y="360" fill="#D8E3EF" font-family="Segoe UI, Arial, sans-serif" font-size="18">Home, services, portfolio, contact and clear calls to action.</text>
-  <rect x="120" y="394" width="128" height="36" rx="18" fill="#FFFFFF" fill-opacity="0.12"/>
-  <text x="151" y="417" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">React + Vite</text>
+  <rect x="88" y="244" width="284" height="278" rx="30" fill="url(#surface-dark)"/>
+  <rect x="88" y="244" width="284" height="10" rx="5" fill="url(#surface-line)"/>
+  <text x="120" y="300" fill="#F59E0B" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">PUBLIC EXPERIENCE</text>
+  <text x="120" y="344" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">
+    <tspan x="120" y="344">Marketing</tspan>
+    <tspan x="120" y="380">website</tspan>
+  </text>
+  <text x="120" y="420" fill="#D8E3EF" font-family="Segoe UI, Arial, sans-serif" font-size="18">
+    <tspan x="120" y="420">Home, services, portfolio,</tspan>
+    <tspan x="120" y="446">contact and conversion pages.</tspan>
+  </text>
+  <rect x="120" y="470" width="132" height="38" rx="19" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="150" y="494" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">React + Vite</text>
 
-  <rect x="402" y="216" width="284" height="244" rx="30" fill="#FFFFFF" stroke="#D2DCE6" stroke-width="2"/>
-  <rect x="402" y="216" width="284" height="10" rx="5" fill="#22D3EE"/>
-  <text x="434" y="274" fill="#0F766E" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">CLIENT WORKSPACE</text>
-  <text x="434" y="322" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Quotes and follow-up</text>
-  <text x="434" y="360" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Secure login, dashboard, project tracking, messages and payment journey.</text>
-  <rect x="434" y="394" width="118" height="36" rx="18" fill="#ECFEFF"/>
-  <text x="463" y="417" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Dashboard</text>
+  <rect x="402" y="244" width="284" height="278" rx="30" fill="#FFFFFF" stroke="#D2DCE6" stroke-width="2"/>
+  <rect x="402" y="244" width="284" height="10" rx="5" fill="#22D3EE"/>
+  <text x="434" y="300" fill="#0F766E" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">CLIENT WORKSPACE</text>
+  <text x="434" y="344" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">
+    <tspan x="434" y="344">Quotes and</tspan>
+    <tspan x="434" y="380">project follow-up</tspan>
+  </text>
+  <text x="434" y="420" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">
+    <tspan x="434" y="420">Secure login, dashboard, messages,</tspan>
+    <tspan x="434" y="446">progress tracking and payments.</tspan>
+  </text>
+  <rect x="434" y="470" width="116" height="38" rx="19" fill="#ECFEFF"/>
+  <text x="463" y="494" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Dashboard</text>
 
-  <rect x="716" y="216" width="284" height="244" rx="30" fill="#FFFFFF" stroke="#D2DCE6" stroke-width="2"/>
-  <rect x="716" y="216" width="284" height="10" rx="5" fill="#F59E0B"/>
-  <text x="748" y="274" fill="#B45309" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">ADMIN CONTROL</text>
-  <text x="748" y="322" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Moderation and ops</text>
-  <text x="748" y="360" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Quote approval, inbox handling, user verification and internal monitoring.</text>
-  <rect x="748" y="394" width="110" height="36" rx="18" fill="#FFF7ED"/>
-  <text x="779" y="417" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Admin flow</text>
+  <rect x="716" y="244" width="284" height="278" rx="30" fill="#FFFFFF" stroke="#D2DCE6" stroke-width="2"/>
+  <rect x="716" y="244" width="284" height="10" rx="5" fill="#F59E0B"/>
+  <text x="748" y="300" fill="#B45309" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">ADMIN CONTROL</text>
+  <text x="748" y="344" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">
+    <tspan x="748" y="344">Moderation</tspan>
+    <tspan x="748" y="380">and operations</tspan>
+  </text>
+  <text x="748" y="420" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">
+    <tspan x="748" y="420">Quote approval, inbox handling,</tspan>
+    <tspan x="748" y="446">user verification and monitoring.</tspan>
+  </text>
+  <rect x="748" y="470" width="110" height="38" rx="19" fill="#FFF7ED"/>
+  <text x="779" y="494" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Admin flow</text>
 
-  <rect x="1030" y="216" width="284" height="244" rx="30" fill="url(#surface-panel)"/>
-  <rect x="1030" y="216" width="284" height="10" rx="5" fill="#FB7185"/>
-  <text x="1062" y="274" fill="#FDBA74" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">TRANSACTIONS</text>
-  <text x="1062" y="322" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Payment and receipts</text>
-  <text x="1062" y="360" fill="#D8E3EF" font-family="Segoe UI, Arial, sans-serif" font-size="18">Card and PayPal flows, payment context and downloadable proof of payment.</text>
-  <rect x="1062" y="394" width="132" height="36" rx="18" fill="#FFFFFF" fill-opacity="0.12"/>
-  <text x="1094" y="417" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Payment page</text>
+  <rect x="1030" y="244" width="284" height="278" rx="30" fill="url(#surface-dark)"/>
+  <rect x="1030" y="244" width="284" height="10" rx="5" fill="#FB7185"/>
+  <text x="1062" y="300" fill="#FDBA74" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1">TRANSACTIONS</text>
+  <text x="1062" y="344" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">
+    <tspan x="1062" y="344">Payments and</tspan>
+    <tspan x="1062" y="380">receipts</tspan>
+  </text>
+  <text x="1062" y="420" fill="#D8E3EF" font-family="Segoe UI, Arial, sans-serif" font-size="18">
+    <tspan x="1062" y="420">Card flows, PayPal context</tspan>
+    <tspan x="1062" y="446">and proof of payment screens.</tspan>
+  </text>
+  <rect x="1062" y="470" width="136" height="38" rx="19" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="1093" y="494" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Payment page</text>
 
-  <rect x="88" y="520" width="1226" height="252" rx="34" fill="#FFFFFF" stroke="#D2DCE6" stroke-width="2"/>
-  <text x="126" y="580" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Cross-cutting capabilities</text>
+  <rect x="88" y="576" width="1226" height="258" rx="34" fill="#FFFFFF" stroke="#D2DCE6" stroke-width="2"/>
+  <text x="126" y="638" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Cross-cutting capabilities</text>
 
-  <rect x="126" y="622" width="258" height="110" rx="24" fill="#F8FAFC"/>
-  <text x="154" y="664" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Chat assistant</text>
-  <text x="154" y="696" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">Contextual answers and guided actions directly inside the app.</text>
+  <rect x="126" y="682" width="258" height="116" rx="24" fill="#F8FAFC"/>
+  <text x="154" y="724" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Chat assistant</text>
+  <text x="154" y="756" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">
+    <tspan x="154" y="756">Contextual answers and</tspan>
+    <tspan x="154" y="780">guided actions in the app.</tspan>
+  </text>
 
-  <rect x="414" y="622" width="258" height="110" rx="24" fill="#ECFEFF"/>
-  <text x="442" y="664" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Email workflows</text>
-  <text x="442" y="696" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">Verification emails, password reset links and account change alerts.</text>
+  <rect x="414" y="682" width="258" height="116" rx="24" fill="#ECFEFF"/>
+  <text x="442" y="724" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Email workflows</text>
+  <text x="442" y="756" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">
+    <tspan x="442" y="756">Verification, password reset</tspan>
+    <tspan x="442" y="780">and account alert emails.</tspan>
+  </text>
 
-  <rect x="702" y="622" width="258" height="110" rx="24" fill="#FFF7ED"/>
-  <text x="730" y="664" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Security middleware</text>
-  <text x="730" y="696" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">Validation, CSRF, CORS, rate limits, masking and hardened cookies.</text>
+  <rect x="702" y="682" width="258" height="116" rx="24" fill="#FFF7ED"/>
+  <text x="730" y="724" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Security middleware</text>
+  <text x="730" y="756" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">
+    <tspan x="730" y="756">Validation, CSRF, CORS,</tspan>
+    <tspan x="730" y="780">rate limits and safe cookies.</tspan>
+  </text>
 
-  <rect x="990" y="622" width="286" height="110" rx="24" fill="#F8FAFC"/>
-  <text x="1018" y="664" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Deployment ready</text>
-  <text x="1018" y="696" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">Ubuntu, Nginx, systemd, Docker and CI security scanning.</text>
+  <rect x="990" y="682" width="286" height="116" rx="24" fill="#F8FAFC"/>
+  <text x="1018" y="724" fill="#0B1F33" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Deployment ready</text>
+  <text x="1018" y="756" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="17">
+    <tspan x="1018" y="756">Ubuntu, Nginx, systemd,</tspan>
+    <tspan x="1018" y="780">Docker and CI security scans.</tspan>
+  </text>
 </svg>
