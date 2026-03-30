@@ -4,6 +4,7 @@
  */
 
 const crypto = require('crypto');
+const { sanitizeUrlForLogging } = require('../utils/request');
 const fetch = (...args) => {
   if (typeof globalThis.fetch === 'function') {
     return globalThis.fetch(...args);
@@ -316,7 +317,7 @@ class CloudflareMiddleware {
         this.logSecurityEvent('WAF_BYPASS_ATTEMPT', {
           ip: req.ip,
           userAgent: req.get('User-Agent'),
-          url: req.url,
+          url: sanitizeUrlForLogging(req.originalUrl || req.url),
           headers: req.headers,
           timestamp: new Date().toISOString()
         });

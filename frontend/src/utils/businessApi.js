@@ -83,3 +83,17 @@ export const sendMessage = async (message) => {
   const payload = await requestJson('/api/messages', buildJsonOptions('POST', message));
   return payload.record || null;
 };
+
+export const requestPasswordChangeEmailLink = async () => {
+  return requestJson('/api/auth/request-password-change', buildJsonOptions('POST'));
+};
+
+export const changeCurrentPassword = async (currentPassword, newPassword) => {
+  return requestJson(
+    '/api/auth/change-password',
+    buildJsonOptions('POST', {
+      currentPassword,
+      newPassword
+    })
+  );
+};

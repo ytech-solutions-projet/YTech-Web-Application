@@ -229,10 +229,10 @@ sudo journalctl -u ytech-frontend -f
 
 ```bash
 # Test base de données
-curl http://192.168.1.16:5001/api/health
+curl https://app.example.com/api/health
 
 # Test upload
-curl -X POST -F "file=@test.txt" http://192.168.1.16:5001/api/upload
+curl -X POST -F "file=@test.txt" https://app.example.com/api/upload
 
 # Test logs
 ls -la /var/www/ytech/logs/
@@ -242,10 +242,10 @@ ls -la /var/www/ytech/logs/
 
 ```bash
 # Rapport d'espace disque
-curl http://192.168.1.16:5001/api/monitoring/disk
+curl https://app.example.com/api/monitoring/disk
 
 # Rapport HTML
-firefox http://192.168.1.16:5001/monitoring/disk_space_report.html
+firefox https://app.example.com/monitoring/disk_space_report.html
 ```
 
 ---
@@ -301,13 +301,13 @@ tar -xzf /var/backups/ytech/uploads/uploads_2026-03-22.tar.gz -C /var/www/
 
 ```bash
 # Statistiques de persistance
-curl http://192.168.1.16:5001/api/persistence/stats
+curl https://app.example.com/api/persistence/stats
 
 # Rapport d'espace disque
-curl http://192.168.1.16:5001/api/persistence/disk-report
+curl https://app.example.com/api/persistence/disk-report
 
 # Statistiques des uploads
-curl http://192.168.1.16:5001/api/persistence/uploads-stats
+curl https://app.example.com/api/persistence/uploads-stats
 ```
 
 ---

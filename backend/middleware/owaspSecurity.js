@@ -8,6 +8,7 @@ const slowDown = require('express-slow-down');
 const crypto = require('crypto');
 const validator = require('validator');
 const xss = require('xss');
+const { sanitizeUrlForLogging } = require('../utils/request');
 
 class OWASPSecurityMiddleware {
   constructor() {
@@ -175,8 +176,19 @@ class OWASPSecurityMiddleware {
         return validationError;
       };
 
-      const sanitizeInput = (input) => {
+      const isSensitiveField = (fieldName = '') =>
+        /password|token|authorization|cookie|csrf/i.test(`${fieldName}`);
+
+      const sanitizeInput = (input, fieldName = '') => {
         if (typeof input !== 'string') return input;
+
+        if (isSensitiveField(fieldName)) {
+          if (input.length > this.securityConfig.injection.maxInputLength) {
+            throw createClientError('Input too long', 'INPUT_TOO_LONG');
+          }
+
+          return input.replace(/\0/g, '');
+        }
         
         // Check for SQL injection patterns
         const sqlPatterns = [
@@ -200,7 +212,7 @@ class OWASPSecurityMiddleware {
         const cmdPatterns = [
           /(;|\||`|\$\(|\$\{)/,
           /(rm\s+-rf|mv\s+|cp\s+|cat\s+|ls\s+)/,
-          /(wget|curl|nc|netcat)/,
+          /\b(wget|curl|nc|netcat)\b/i,
           /(\.\.\/|\.\.\\)/
         ];
         
@@ -235,13 +247,13 @@ class OWASPSecurityMiddleware {
       };
       
       // Sanitize all inputs
-      const sanitizeObject = (obj) => {
-        if (typeof obj === 'string') return sanitizeInput(obj);
-        if (Array.isArray(obj)) return obj.map(sanitizeObject);
+      const sanitizeObject = (obj, fieldName = '') => {
+        if (typeof obj === 'string') return sanitizeInput(obj, fieldName);
+        if (Array.isArray(obj)) return obj.map((value) => sanitizeObject(value, fieldName));
         if (obj && typeof obj === 'object') {
           const sanitized = {};
           for (const [key, value] of Object.entries(obj)) {
-            sanitized[key] = sanitizeObject(value);
+            sanitized[key] = sanitizeObject(value, key);
           }
           return sanitized;
         }
@@ -378,7 +390,7 @@ class OWASPSecurityMiddleware {
       const logEntry = {
         timestamp: new Date().toISOString(),
         method: req.method,
-        url: req.url,
+        url: sanitizeUrlForLogging(req.originalUrl || req.url),
         ip: req.ip,
         userAgent: req.get('User-Agent'),
         userId: req.user?.id || 'anonymous',

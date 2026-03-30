@@ -168,7 +168,7 @@ class User {
   }
 
   static async findById(id, options = {}) {
-    const fields = await this.getSelectableUserFields(false, options);
+    const fields = await this.getSelectableUserFields(Boolean(options.includePassword), options);
     const users = await database.query(
       `SELECT ${fields.join(', ')} FROM users WHERE id = $1`,
       [id]

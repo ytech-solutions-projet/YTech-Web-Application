@@ -223,6 +223,69 @@ const sendPasswordResetEmail = async ({ to, name, resetUrl, expiresInMinutes }) 
   };
 };
 
+const buildPasswordChangedAlertTemplate = ({
+  name,
+  changedAt,
+  ipAddress,
+  userAgent,
+  supportEmail
+}) => {
+  const safeName = escapeHtml(name || 'client');
+  const safeSupportEmail = escapeHtml(supportEmail);
+  const safeChangedAt = escapeHtml(
+    changedAt instanceof Date ? changedAt.toISOString() : changedAt || new Date().toISOString()
+  );
+  const safeIpAddress = escapeHtml(ipAddress || 'indisponible');
+  const safeUserAgent = escapeHtml(userAgent || 'indisponible');
+
+  return {
+    subject: 'Alerte securite YTECH: mot de passe modifie',
+    text: [
+      `Bonjour ${name || 'client'},`,
+      '',
+      'Le mot de passe de votre compte YTECH a ete modifie.',
+      `Date UTC: ${safeChangedAt}`,
+      `Adresse IP: ${ipAddress || 'indisponible'}`,
+      `Navigateur/Appareil: ${userAgent || 'indisponible'}`,
+      '',
+      "Si vous etes a l origine de cette action, aucune autre etape n est necessaire.",
+      "Si ce n est pas vous, demandez immediatement une reinitialisation de mot de passe et contactez le support.",
+      '',
+      `Support YTECH: ${supportEmail}`
+    ].join('\n'),
+    html: `
+      <div style="margin:0;padding:32px;background:#f5efe4;font-family:Segoe UI,Arial,sans-serif;color:#14233b;">
+        <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:28px;overflow:hidden;border:1px solid rgba(20,35,59,0.08);">
+          <div style="padding:28px 32px;background:linear-gradient(135deg,#7c2d12 0%,#12304d 100%);color:#ffffff;">
+            <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;opacity:0.78;">Alerte securite YTECH</div>
+            <h1 style="margin:12px 0 0;font-size:28px;line-height:1.2;">Mot de passe modifie</h1>
+          </div>
+          <div style="padding:32px;">
+            <p style="margin:0 0 16px;font-size:16px;line-height:1.7;">Bonjour ${safeName},</p>
+            <p style="margin:0 0 16px;font-size:16px;line-height:1.7;">
+              Le mot de passe de votre compte YTECH vient d etre mis a jour.
+            </p>
+            <div style="margin:0 0 24px;padding:18px;border-radius:18px;background:#f8fafc;border:1px solid rgba(20,35,59,0.08);">
+              <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#4b5b73;"><strong>Date UTC:</strong> ${safeChangedAt}</p>
+              <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#4b5b73;"><strong>Adresse IP:</strong> ${safeIpAddress}</p>
+              <p style="margin:0;font-size:14px;line-height:1.6;color:#4b5b73;"><strong>Navigateur/Appareil:</strong> ${safeUserAgent}</p>
+            </div>
+            <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#4b5b73;">
+              Si vous etes a l origine de cette action, vous pouvez ignorer cet email.
+            </p>
+            <p style="margin:0;font-size:14px;line-height:1.7;color:#4b5b73;">
+              Si vous ne reconnaissez pas cette modification, demandez tout de suite une reinitialisation du mot de passe et contactez le support.
+            </p>
+          </div>
+          <div style="padding:18px 32px;background:#f9f4ed;border-top:1px solid rgba(20,35,59,0.08);font-size:13px;color:#5d6b82;">
+            Support YTECH: <a href="mailto:${safeSupportEmail}" style="color:#12797b;">${safeSupportEmail}</a>
+          </div>
+        </div>
+      </div>
+    `
+  };
+};
+
 const sendEmailVerificationEmail = async ({ to, name, verificationUrl, expiresInHours }) => {
   const recipient = normalizeEmail(to);
   if (!isValidEmail(recipient)) {
@@ -261,8 +324,54 @@ const sendEmailVerificationEmail = async ({ to, name, verificationUrl, expiresIn
   };
 };
 
+const sendPasswordChangedAlertEmail = async ({
+  to,
+  name,
+  changedAt,
+  ipAddress,
+  userAgent
+}) => {
+  const recipient = normalizeEmail(to);
+  if (!isValidEmail(recipient)) {
+    throw new Error('Adresse email de destination invalide');
+  }
+
+  const mailer = getTransporter();
+  if (!mailer) {
+    return {
+      delivered: false,
+      skipped: true,
+      reason: 'missing_email_configuration'
+    };
+  }
+
+  const sender = getSenderIdentity();
+  const template = buildPasswordChangedAlertTemplate({
+    name,
+    changedAt,
+    ipAddress,
+    userAgent,
+    supportEmail: sender.address
+  });
+
+  const info = await mailer.sendMail({
+    from: sender,
+    to: recipient,
+    replyTo: sender.address,
+    subject: template.subject,
+    text: template.text,
+    html: template.html
+  });
+
+  return {
+    delivered: true,
+    messageId: info.messageId || ''
+  };
+};
+
 module.exports = {
   isEmailConfigured,
   sendEmailVerificationEmail,
+  sendPasswordChangedAlertEmail,
   sendPasswordResetEmail
 };

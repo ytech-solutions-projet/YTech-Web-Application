@@ -4,7 +4,11 @@ import '../styles/app-shell.css';
 import { formatDate, getInitials } from '../utils/helpers';
 import { buildQuotePaymentPath, buildReceiptPath, openQuotePaymentWindow } from '../utils/paymentSession';
 import { readAuthUser } from '../utils/storage';
-import { listContactRequests, listMessages, listQuotes } from '../utils/businessApi';
+import {
+  listContactRequests,
+  listMessages,
+  listQuotes
+} from '../utils/businessApi';
 
 const getContactRequestLabel = (request = {}) =>
   request.requestLabel?.trim()
@@ -95,6 +99,36 @@ const renderEmpty = (icon, title, text) => (
     <div className="workspace-empty__icon">{icon}</div>
     <div className="workspace-empty__title">{title}</div>
     <div className="workspace-empty__text">{text}</div>
+  </div>
+);
+
+const AccountSecurityShortcut = ({ email, isAdmin }) => (
+  <div className="workspace-card workspace-card--padded">
+    <div className="workspace-section-head">
+      <div>
+        <h2 className="workspace-section-title">Securite du compte</h2>
+        <p className="workspace-section-copy">
+          Le mot de passe se modifie maintenant uniquement dans Parametres, avec verification de
+          l ancien mot de passe ou envoi d un lien securise par email.
+        </p>
+      </div>
+      <span className={`workspace-pill ${isAdmin ? 'is-danger' : 'is-info'}`}>
+        {isAdmin ? 'Acces admin' : 'Acces client'}
+      </span>
+    </div>
+
+    <p className="workspace-note" style={{ marginTop: '0.85rem' }}>
+      Adresse de recuperation: <strong>{email}</strong>
+    </p>
+
+    <div className="workspace-inline-actions" style={{ marginTop: '1rem' }}>
+      <Link to="/settings" className="workspace-inline-btn is-info">
+        Ouvrir les parametres
+      </Link>
+      <Link to="/forgot-password" className="workspace-inline-btn">
+        Page publique
+      </Link>
+    </div>
   </div>
 );
 
@@ -256,6 +290,13 @@ const Dashboard = () => {
                       <div className="workspace-action-card__text">Voir les conversations et demandes entrantes.</div>
                     </div>
                   </Link>
+                  <Link to="/settings" className="workspace-action-card">
+                    <span className="workspace-action-card__icon">SEC</span>
+                    <div>
+                      <div className="workspace-action-card__title">Parametres</div>
+                      <div className="workspace-action-card__text">Modifier le mot de passe et securiser le compte admin.</div>
+                    </div>
+                  </Link>
                   <Link to="/devis-management" className="workspace-action-card">
                     <span className="workspace-action-card__icon">PAY</span>
                     <div>
@@ -292,6 +333,8 @@ const Dashboard = () => {
                   <div className="workspace-metric__label">Demandes de contact</div>
                 </div>
               </div>
+
+              <AccountSecurityShortcut email={user.email} isAdmin={isAdmin} />
 
               <div className="workspace-card workspace-card--padded">
                 <div className="workspace-section-head">
@@ -474,6 +517,13 @@ const Dashboard = () => {
                     <div className="workspace-action-card__text">Echanger avec l equipe.</div>
                   </div>
                 </Link>
+                <Link to="/settings" className="workspace-action-card">
+                  <span className="workspace-action-card__icon">SEC</span>
+                  <div>
+                    <div className="workspace-action-card__title">Parametres</div>
+                    <div className="workspace-action-card__text">Changer le mot de passe depuis votre espace securise.</div>
+                  </div>
+                </Link>
               </div>
             </div>
           </aside>
@@ -496,6 +546,8 @@ const Dashboard = () => {
                 <div className="workspace-metric__label">Devis</div>
               </div>
             </div>
+
+            <AccountSecurityShortcut email={user.email} isAdmin={isAdmin} />
 
             <div className="workspace-card workspace-card--padded">
               <div className="workspace-section-head">

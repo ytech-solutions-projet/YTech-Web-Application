@@ -1,7 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { fetchJson } from '../utils/http';
-import { AUTH_CHANGE_EVENT, clearAuthSession, removeStorageKey } from '../utils/storage';
+import {
+  AUTH_CHANGE_EVENT,
+  clearAuthSession,
+  readAuthUser,
+  removeStorageKey
+} from '../utils/storage';
 import './Header.css';
 
 const publicLinks = [
@@ -36,20 +41,11 @@ const getUserInitials = (name = '') => {
 
 const readAuthState = () => {
   try {
-    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    const rawUser = localStorage.getItem('user');
-    const parsedUser = rawUser ? JSON.parse(rawUser) : null;
-
-    if (!loggedIn || !parsedUser) {
-      return {
-        isLoggedIn: false,
-        user: null
-      };
-    }
+    const user = readAuthUser();
 
     return {
-      isLoggedIn: true,
-      user: parsedUser
+      isLoggedIn: Boolean(user),
+      user
     };
   } catch (error) {
     console.warn("Impossible de lire l'etat de connexion.", error);
@@ -75,13 +71,15 @@ const Header = ({ theme = 'light', onToggleTheme = () => {} }) => {
       ? [
           { to: '/dashboard', label: 'Espace admin' },
           { to: '/devis-management', label: 'Gestion devis' },
-          { to: '/admin-messages', label: 'Conversations' }
+          { to: '/admin-messages', label: 'Conversations' },
+          { to: '/settings', label: 'Parametres' }
         ]
       : [
           { to: '/dashboard', label: 'Dashboard' },
           { to: '/devis-management', label: 'Mes devis' },
           { to: '/payment', label: 'Paiement' },
-          { to: '/messages', label: 'Messages' }
+          { to: '/messages', label: 'Messages' },
+          { to: '/settings', label: 'Parametres' }
         ]
     : [];
 

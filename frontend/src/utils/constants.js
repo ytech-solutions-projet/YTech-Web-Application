@@ -1,9 +1,18 @@
+const resolveDefaultWebsocketUrl = () => {
+  if (typeof window === 'undefined' || !window.location) {
+    return '';
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}`;
+};
+
 export const APP_CONFIG = {
   name: 'YTECH',
   version: process.env.REACT_APP_VERSION || '1.0.0',
   environment: process.env.REACT_APP_ENV || 'development',
   apiBaseUrl: process.env.REACT_APP_API_URL || '',
-  websocketUrl: process.env.REACT_APP_WS_URL || 'ws://192.168.10.41:5001'
+  websocketUrl: process.env.REACT_APP_WS_URL || resolveDefaultWebsocketUrl()
 };
 
 export const ROUTES = {

@@ -33,6 +33,7 @@ const { initializeDatabase } = require('./utils/databaseBootstrap');
 const { createRequestLog } = require('./utils/request');
 const {
   getAllowedOrigins,
+  normalizeText,
   parseBoolean,
   parseInteger,
   validateSecurityConfiguration
@@ -41,8 +42,23 @@ const {
 const PORT = parseInteger(process.env.PORT, 5001);
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_PRODUCTION = NODE_ENV === 'production';
+const HOST = normalizeText(process.env.HOST, { maxLength: 255 }) || (IS_PRODUCTION ? '127.0.0.1' : '0.0.0.0');
 const ALLOWED_ORIGINS = getAllowedOrigins();
+const PUBLIC_APP_URL = normalizeText(process.env.FRONTEND_URL, { maxLength: 2048 }).replace(/\/+$/, '');
+const PUBLIC_API_URL = (
+  normalizeText(process.env.PUBLIC_API_URL, { maxLength: 2048 })
+  || (PUBLIC_APP_URL ? `${PUBLIC_APP_URL}/api` : '')
+).replace(/\/+$/, '');
 const CSP_CONNECT_SOURCES = ["'self'"];
+const toWebSocketOrigin = (origin) => {
+  try {
+    const normalizedOrigin = new URL(origin);
+    normalizedOrigin.protocol = normalizedOrigin.protocol === 'https:' ? 'wss:' : 'ws:';
+    return normalizedOrigin.origin;
+  } catch (error) {
+    return '';
+  }
+};
 const CSP_DIRECTIVES = {
   defaultSrc: ["'self'"],
   styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
@@ -65,11 +81,11 @@ const CSP_DIRECTIVES = {
 };
 
 if (!IS_PRODUCTION) {
+  const devConnectSources = ALLOWED_ORIGINS.flatMap((origin) => [origin, toWebSocketOrigin(origin)])
+    .filter(Boolean);
+
   CSP_CONNECT_SOURCES.push(
-    ...ALLOWED_ORIGINS,
-    'ws://localhost:3000',
-    'ws://127.0.0.1:3000',
-    'ws://192.168.10.41:3000'
+    ...devConnectSources
   );
 }
 
@@ -82,13 +98,20 @@ if (IS_PRODUCTION) {
 const app = express();
 const runtimeServices = [];
 
-const sanitizeRequestStrings = (value) => {
+const isSensitiveInputKey = (fieldName = '') =>
+  /password|token|authorization|cookie|csrf/i.test(`${fieldName}`);
+
+const sanitizeRequestStrings = (value, fieldName = '') => {
   if (typeof value === 'string') {
+    if (isSensitiveInputKey(fieldName)) {
+      return value;
+    }
+
     return xss(value);
   }
 
   if (Array.isArray(value)) {
-    return value.map((entry) => sanitizeRequestStrings(entry));
+    return value.map((entry) => sanitizeRequestStrings(entry, fieldName));
   }
 
   if (!value || typeof value !== 'object') {
@@ -96,7 +119,7 @@ const sanitizeRequestStrings = (value) => {
   }
 
   return Object.fromEntries(
-    Object.entries(value).map(([key, currentValue]) => [key, sanitizeRequestStrings(currentValue)])
+    Object.entries(value).map(([key, currentValue]) => [key, sanitizeRequestStrings(currentValue, key)])
   );
 };
 
@@ -364,20 +387,27 @@ async function startServer() {
     await initializeRuntimeServices();
 
     // Démarrage du serveur
-    serverInstance = app.listen(PORT, () => {
-      const publicApiUrl = `http://192.168.10.41:${PORT}`;
+    serverInstance = app.listen(PORT, HOST, () => {
+      const localApiUrl = `http://${HOST === '0.0.0.0' ? '127.0.0.1' : HOST}:${PORT}`;
       console.log('YTECH Server Started Successfully');
       console.log('=====================================');
+      console.log(`Host: ${HOST}`);
       console.log(`Port: ${PORT}`);
       console.log(`Environment: ${NODE_ENV}`);
       console.log('Database: Connected');
       console.log(
         `Admin Seed: ${adminSeed?.email || 'admin@ytech.ma'} (${adminSeed?.created ? 'created' : 'updated'})`
       );
-      console.log(`API: ${publicApiUrl}`);
+      console.log(`Internal API: ${localApiUrl}`);
+      if (PUBLIC_APP_URL) {
+        console.log(`Frontend URL: ${PUBLIC_APP_URL}`);
+      }
+      if (PUBLIC_API_URL) {
+        console.log(`Public API: ${PUBLIC_API_URL}`);
+      }
       console.log('=====================================');
-      console.log('Development Mode Active');
-      console.log(`Health Check: ${publicApiUrl}/api/health`);
+      console.log(`${IS_PRODUCTION ? 'Production' : 'Development'} Mode Active`);
+      console.log(`Health Check: ${localApiUrl}/api/health`);
       console.log('=====================================');
       console.log(' Military Grade Security: ENABLED');
       console.log(` Runtime Services: ${runtimeServices.length > 0 ? 'ACTIVE' : 'DISABLED'}`);

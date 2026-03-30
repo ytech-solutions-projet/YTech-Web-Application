@@ -105,7 +105,11 @@ export const ensureCsrfToken = async () => {
         const payload = await response.json().catch(() => null);
 
         if (!response.ok || payload?.success === false) {
-          throw new Error(payload?.error || 'Impossible de charger le token de securite');
+          throw new Error(
+            payload?.error
+            || payload?.message
+            || 'Impossible de charger le token de securite. Verifiez que le backend tourne et que le proxy dev pointe vers le bon serveur.'
+          );
         }
 
         return payload?.csrfToken || readCsrfTokenFromCookie();

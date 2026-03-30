@@ -1,10 +1,10 @@
 const crypto = require('crypto');
 
-const DEFAULT_ALLOWED_DEV_ORIGINS = [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://192.168.10.41:3000'
-];
+const DEFAULT_DEV_HOSTS = ['localhost', '127.0.0.1'];
+const DEFAULT_DEV_PORTS = [3000, 3001, 4173, 5173, 5174];
+const DEFAULT_ALLOWED_DEV_ORIGINS = DEFAULT_DEV_HOSTS.flatMap((host) =>
+  DEFAULT_DEV_PORTS.map((port) => `http://${host}:${port}`)
+);
 const MIN_SECRET_LENGTH = 32;
 const MIN_PASSWORD_LENGTH = 12;
 const SAFE_HTTP_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -126,11 +126,22 @@ const getAllowedOrigins = () => {
     .map((value) => normalizeOrigin(value))
     .filter(Boolean);
 
-  if (configuredOrigins.length > 0) {
+  if (process.env.NODE_ENV === 'production') {
     return [...new Set(configuredOrigins)];
   }
 
-  return process.env.NODE_ENV === 'production' ? [] : DEFAULT_ALLOWED_DEV_ORIGINS;
+  const extraDevOrigins = `${process.env.DEV_ALLOWED_ORIGINS || ''}`
+    .split(',')
+    .map((value) => normalizeOrigin(value))
+    .filter(Boolean);
+
+  return [
+    ...new Set([
+      ...DEFAULT_ALLOWED_DEV_ORIGINS,
+      ...configuredOrigins,
+      ...extraDevOrigins
+    ])
+  ];
 };
 
 const isPlaceholderSecret = (value = '') => {

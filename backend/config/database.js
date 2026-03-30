@@ -4,29 +4,16 @@
 
 const fs = require('fs');
 const { Pool } = require('pg');
-const { normalizeText, parseBoolean } = require('../utils/security');
+const { normalizeText, parseBoolean, parseInteger } = require('../utils/security');
 
 class Database {
   constructor() {
     this.isProduction = process.env.NODE_ENV === 'production';
     this.verboseLogs = parseBoolean(process.env.DB_DEBUG_LOGS, !this.isProduction);
     this.ssl = this.buildSslConfig();
+    this.poolConfig = this.buildPoolConfig();
 
-    this.pool = new Pool({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'ytech_user',
-      password: process.env.DB_PASSWORD || undefined,
-      database: process.env.DB_NAME || 'ytech_db',
-      port: process.env.DB_PORT || 5432,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-      ssl: this.ssl,
-      statement_timeout: 10000,
-      query_timeout: 10000,
-      application_name: 'YTECH_Backend',
-      charset: 'utf8'
-    });
+    this.pool = new Pool(this.poolConfig);
 
     this.pool.on('error', (error) => {
       console.error('Erreur inattendue du pool PostgreSQL:', error);
@@ -67,6 +54,42 @@ class Database {
     }
 
     return ssl;
+  }
+
+  buildPoolConfig() {
+    const databaseUrl = normalizeText(process.env.DATABASE_URL, { maxLength: 4096 });
+    const sharedConfig = {
+      max: parseInteger(process.env.DB_POOL_MAX, 20),
+      idleTimeoutMillis: parseInteger(process.env.DB_IDLE_TIMEOUT_MS, 30000),
+      connectionTimeoutMillis: parseInteger(process.env.DB_CONNECTION_TIMEOUT_MS, 5000),
+      ssl: this.ssl,
+      statement_timeout: parseInteger(process.env.DB_STATEMENT_TIMEOUT_MS, 10000),
+      query_timeout: parseInteger(process.env.DB_QUERY_TIMEOUT_MS, 10000),
+      application_name:
+        normalizeText(process.env.DB_APPLICATION_NAME, { maxLength: 64 }) || 'YTECH_Backend',
+      charset: 'utf8',
+      keepAlive: parseBoolean(process.env.DB_KEEP_ALIVE, true),
+      keepAliveInitialDelayMillis: parseInteger(
+        process.env.DB_KEEP_ALIVE_INITIAL_DELAY_MS,
+        10000
+      )
+    };
+
+    if (databaseUrl) {
+      return {
+        connectionString: databaseUrl,
+        ...sharedConfig
+      };
+    }
+
+    return {
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'ytech_user',
+      password: process.env.DB_PASSWORD || undefined,
+      database: process.env.DB_NAME || 'ytech_db',
+      port: parseInteger(process.env.DB_PORT, 5432),
+      ...sharedConfig
+    };
   }
 
   async query(sql, params = []) {

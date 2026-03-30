@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { createRequestLog } = require('./request');
 const getFetch = async () => {
   if (typeof fetch === 'function') {
     return fetch;
@@ -180,12 +181,11 @@ class SecurityMonitoringSystem {
     );
     
     if (isSuspicious) {
+      const requestLog = createRequestLog(req);
       this.metrics.suspiciousRequests++;
       this.logSecurityEvent('SUSPICIOUS_REQUEST', {
-        url: req.url,
+        ...requestLog,
         method: req.method,
-        body: req.body,
-        query: req.query,
         ip: req.ip,
         userAgent: req.get('User-Agent'),
         requestId: req.requestId
@@ -256,6 +256,42 @@ class SecurityMonitoringSystem {
       ip,
       userAgent
     }, 'MEDIUM');
+  }
+
+  trackPasswordResetCompletion(userId, email, ip, userAgent, origin = 'reset-link') {
+    this.logAuditEvent('PASSWORD_RESET_COMPLETED', userId, {
+      email,
+      ip,
+      userAgent,
+      origin,
+      timestamp: new Date().toISOString()
+    });
+
+    this.logSecurityEvent('PASSWORD_RESET_COMPLETED', {
+      userId,
+      email,
+      ip,
+      userAgent,
+      origin
+    }, 'HIGH');
+  }
+
+  trackPasswordChange(userId, email, ip, userAgent, origin = 'authenticated-session') {
+    this.logAuditEvent('PASSWORD_CHANGED', userId, {
+      email,
+      ip,
+      userAgent,
+      origin,
+      timestamp: new Date().toISOString()
+    });
+
+    this.logSecurityEvent('PASSWORD_CHANGED', {
+      userId,
+      email,
+      ip,
+      userAgent,
+      origin
+    }, 'HIGH');
   }
 
   trackDataAccess(userId, resource, action, ip) {

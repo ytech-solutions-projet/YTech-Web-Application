@@ -11,7 +11,11 @@ const User = require('../models/User');
 const { authenticateRequest } = require('../middleware/auth');
 const militaryJWT = require('../utils/militaryJWT');
 const securityMonitor = require('../utils/securityMonitor');
-const { sendEmailVerificationEmail, sendPasswordResetEmail } = require('../utils/email');
+const {
+  sendEmailVerificationEmail,
+  sendPasswordChangedAlertEmail,
+  sendPasswordResetEmail
+} = require('../utils/email');
 const { isValidPhone, normalizePhone } = require('../utils/phone');
 const { getAuthToken } = require('../utils/request');
 const {
@@ -57,6 +61,11 @@ const registerLimiter = createLimiter(
 const passwordResetLimiter = createLimiter(
   parseInteger(process.env.PASSWORD_RESET_RATE_LIMIT_MAX, 5),
   'Trop de demandes de reinitialisation. Reessayez plus tard.'
+);
+
+const passwordChangeLimiter = createLimiter(
+  parseInteger(process.env.PASSWORD_CHANGE_RATE_LIMIT_MAX, 5),
+  'Trop de tentatives de modification du mot de passe. Reessayez plus tard.'
 );
 
 const emailVerificationLimiter = createLimiter(
@@ -113,7 +122,7 @@ class AuthController {
   static getPasswordResetBaseUrl() {
     return normalizeText(process.env.PASSWORD_RESET_BASE_URL || process.env.FRONTEND_URL, {
       maxLength: 2048
-    }) || 'http://192.168.10.41:3000';
+    }) || 'http://localhost:3000';
   }
 
   static getPasswordResetExpiresInMinutes() {
@@ -124,10 +133,17 @@ class AuthController {
     return `${this.getPasswordResetBaseUrl()}/reset-password?token=${encodeURIComponent(resetToken)}`;
   }
 
+  static shouldLogPasswordResetUrl() {
+    return parseBoolean(
+      process.env.LOG_PASSWORD_RESET_URLS,
+      process.env.NODE_ENV !== 'production'
+    );
+  }
+
   static getEmailVerificationBaseUrl() {
     return normalizeText(process.env.EMAIL_VERIFICATION_BASE_URL || process.env.FRONTEND_URL, {
       maxLength: 2048
-    }) || 'http://192.168.10.41:3000';
+    }) || 'http://localhost:3000';
   }
 
   static getEmailVerificationExpiresInHours() {
@@ -163,6 +179,89 @@ class AuthController {
       skipped: Boolean(emailDelivery?.skipped),
       reason: normalizeText(emailDelivery?.reason, { maxLength: 120 }) || ''
     };
+  }
+
+  static buildGenericPasswordResetMessage() {
+    return 'Si cet email existe, un lien de reinitialisation sera envoye';
+  }
+
+  static async issuePasswordReset(user, req) {
+    const resetToken = crypto.randomBytes(48).toString('hex');
+    const expiresInMinutes = this.getPasswordResetExpiresInMinutes();
+    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+    const resetUrl = this.buildPasswordResetUrl(resetToken);
+
+    await User.storePasswordResetToken(user.id, resetToken, {
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent'),
+      expiresAt
+    });
+
+    securityMonitor.trackPasswordReset(user.email, req.ip, req.get('User-Agent'));
+
+    let emailDelivery = {
+      delivered: false,
+      skipped: false
+    };
+
+    try {
+      emailDelivery = await sendPasswordResetEmail({
+        to: user.email,
+        name: user.name,
+        resetUrl,
+        expiresInMinutes
+      });
+    } catch (emailError) {
+      console.error('Erreur envoi email reset password:', emailError);
+      await User.invalidatePasswordResetTokens(user.id);
+    }
+
+    const shouldLogResetUrl = this.shouldLogPasswordResetUrl();
+
+    if (!emailDelivery.delivered && !shouldLogResetUrl) {
+      await User.invalidatePasswordResetTokens(user.id);
+    }
+
+    if (shouldLogResetUrl) {
+      console.log(
+        `Lien de reinitialisation pour ${user.email}${emailDelivery.delivered ? ' (email envoye)' : ''}:`
+      );
+      console.log(resetUrl);
+    }
+
+    return {
+      emailDelivery,
+      expiresInMinutes,
+      resetToken: process.env.NODE_ENV === 'development' ? resetToken : null,
+      resetUrl: shouldLogResetUrl ? resetUrl : null
+    };
+  }
+
+  static async notifyPasswordChanged(user, req, changedAt = new Date()) {
+    if (!user?.email) {
+      return {
+        delivered: false,
+        skipped: true,
+        reason: 'missing_user_email'
+      };
+    }
+
+    try {
+      return await sendPasswordChangedAlertEmail({
+        to: user.email,
+        name: user.name,
+        changedAt,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+    } catch (error) {
+      console.error('Erreur envoi email alerte changement mot de passe:', error);
+      return {
+        delivered: false,
+        skipped: true,
+        reason: 'password_change_alert_failed'
+      };
+    }
   }
 
   static async sendEmailVerification(user, req) {
@@ -408,6 +507,7 @@ router.post('/login', authLimiter, async (req, res) => {
     const passwordMatch = await bcrypt.compare(password, user?.password || DUMMY_PASSWORD_HASH);
 
     if (!user || !user.password) {
+      securityMonitor.trackFailedLogin(req.ip, email, req.get('User-Agent'));
       return res.status(401).json({
         success: false,
         error: 'Email ou mot de passe incorrect'
@@ -430,6 +530,7 @@ router.post('/login', authLimiter, async (req, res) => {
 
     if (!passwordMatch) {
       const failedLoginState = await User.recordFailedLogin(user.id);
+      securityMonitor.trackFailedLogin(req.ip, email, req.get('User-Agent'));
 
       return res.status(User.isLoginLocked(failedLoginState) ? 429 : 401).json({
         success: false,
@@ -451,6 +552,7 @@ router.post('/login', authLimiter, async (req, res) => {
     const sessionToken = AuthController.generateSessionToken();
     await User.createSession(user.id, sessionToken, req.ip, req.get('User-Agent'));
     await User.markLoginSuccess(user.id);
+    securityMonitor.trackSuccessfulLogin(user.id, req.ip, req.get('User-Agent'));
 
     const authenticatedUser = await User.findById(user.id);
     return AuthController.sendAuthSuccess(res, authenticatedUser, sessionToken, 'Connexion reussie');
@@ -515,6 +617,130 @@ router.get('/verify', authenticateRequest, async (req, res) => {
   });
 });
 
+router.post('/request-password-change', authenticateRequest, passwordChangeLimiter, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.details.id);
+
+    if (!user || !user.is_active) {
+      return res.status(404).json({
+        success: false,
+        error: 'Compte introuvable ou desactive'
+      });
+    }
+
+    const resetDetails = await AuthController.issuePasswordReset(user, req);
+
+    return res.json({
+      success: true,
+      message: `Un lien securise a ete envoye a ${user.email}.`,
+      email: user.email,
+      emailDelivery: AuthController.serializeEmailDelivery(resetDetails.emailDelivery),
+      resetUrl: resetDetails.resetUrl,
+      resetToken: resetDetails.resetToken
+    });
+  } catch (error) {
+    console.error('Erreur demande changement mot de passe par email:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Une erreur est survenue. Veuillez reessayer plus tard.'
+    });
+  }
+});
+
+router.post('/change-password', authenticateRequest, passwordChangeLimiter, async (req, res) => {
+  try {
+    const currentPassword = `${req.body?.currentPassword || ''}`;
+    const newPassword = `${req.body?.newPassword || ''}`;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mot de passe actuel et nouveau mot de passe requis'
+      });
+    }
+
+    const user = await User.findById(req.user.details.id, {
+      includePassword: true,
+      includeSecurityState: true
+    });
+
+    if (!user || !user.password || !user.is_active) {
+      return res.status(404).json({
+        success: false,
+        error: 'Compte introuvable ou desactive'
+      });
+    }
+
+    const currentPasswordMatch = await bcrypt.compare(currentPassword, user.password);
+
+    if (!currentPasswordMatch) {
+      securityMonitor.logSecurityEvent('FAILED_PASSWORD_CHANGE', {
+        userId: user.id,
+        email: user.email,
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      }, 'MEDIUM');
+
+      return res.status(401).json({
+        success: false,
+        error: 'Mot de passe actuel incorrect'
+      });
+    }
+
+    const passwordError = militaryJWT.validatePasswordStrength(newPassword);
+    if (!passwordError.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: `Mot de passe faible: ${passwordError.issues.join(', ')}`
+      });
+    }
+
+    const reusedPassword = await bcrypt.compare(newPassword, user.password);
+    if (reusedPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Le nouveau mot de passe doit etre different de l ancien'
+      });
+    }
+
+    await User.updatePassword(user.id, newPassword);
+    await User.invalidatePasswordResetTokens(user.id);
+    await User.invalidateEmailVerificationTokens(user.id);
+    await User.invalidateAllSessions(user.id);
+
+    const nextSessionToken = AuthController.generateSessionToken();
+    await User.createSession(user.id, nextSessionToken, req.ip, req.get('User-Agent'));
+    const authenticatedUser = await User.findById(user.id);
+    const changedAt = new Date();
+
+    securityMonitor.trackPasswordChange(
+      user.id,
+      user.email,
+      req.ip,
+      req.get('User-Agent'),
+      'authenticated-session'
+    );
+    await AuthController.notifyPasswordChanged(user, req, changedAt);
+
+    if (req.authToken) {
+      militaryJWT.revokeToken(req.authToken);
+    }
+
+    return AuthController.sendAuthSuccess(
+      res,
+      authenticatedUser,
+      nextSessionToken,
+      'Mot de passe mis a jour avec succes. Les autres sessions ont ete deconnectees.'
+    );
+  } catch (error) {
+    console.error('Erreur changement mot de passe:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Une erreur est survenue. Veuillez reessayer plus tard.'
+    });
+  }
+});
+
 router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
@@ -527,64 +753,20 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
     }
 
     const user = await User.findByEmail(email);
-    if (!user) {
+    if (!user || !user.is_active) {
       return res.json({
         success: true,
-        message: 'Si cet email existe, un lien de reinitialisation sera envoye'
+        message: AuthController.buildGenericPasswordResetMessage()
       });
     }
 
-    const resetToken = crypto.randomBytes(48).toString('hex');
-    const expiresInMinutes = AuthController.getPasswordResetExpiresInMinutes();
-    const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
-    const resetUrl = AuthController.buildPasswordResetUrl(resetToken);
-
-    await User.storePasswordResetToken(user.id, resetToken, {
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent'),
-      expiresAt
-    });
-
-    securityMonitor.trackPasswordReset(email, req.ip, req.get('User-Agent'));
-
-    let emailDelivery = {
-      delivered: false,
-      skipped: false
-    };
-
-    try {
-      emailDelivery = await sendPasswordResetEmail({
-        to: email,
-        name: user.name,
-        resetUrl,
-        expiresInMinutes
-      });
-    } catch (emailError) {
-      console.error('Erreur envoi email reset password:', emailError);
-      await User.invalidatePasswordResetTokens(user.id);
-    }
-
-    const shouldLogResetUrl = parseBoolean(
-      process.env.LOG_PASSWORD_RESET_URLS,
-      process.env.NODE_ENV !== 'production'
-    );
-
-    if (!emailDelivery.delivered && !shouldLogResetUrl) {
-      await User.invalidatePasswordResetTokens(user.id);
-    }
-
-    if (shouldLogResetUrl) {
-      console.log(
-        `Lien de reinitialisation pour ${email}${emailDelivery.delivered ? ' (email envoye)' : ''}:`
-      );
-      console.log(resetUrl);
-    }
+    const resetDetails = await AuthController.issuePasswordReset(user, req);
 
     return res.json({
       success: true,
-      message: 'Si cet email existe, un lien de reinitialisation sera envoye',
-      resetToken: process.env.NODE_ENV === 'development' ? resetToken : null,
-      resetUrl: shouldLogResetUrl ? resetUrl : null
+      message: AuthController.buildGenericPasswordResetMessage(),
+      resetToken: resetDetails.resetToken,
+      resetUrl: resetDetails.resetUrl
     });
   } catch (error) {
     console.error('Erreur forgot password:', error);
@@ -656,10 +838,39 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
       });
     }
 
+    const user = await User.findById(resetRequest.user_id, {
+      includePassword: true
+    });
+
+    if (!user || !user.password || !user.is_active) {
+      return res.status(400).json({
+        success: false,
+        error: 'Compte introuvable ou desactive'
+      });
+    }
+
+    const reusedPassword = await bcrypt.compare(newPassword, user.password);
+    if (reusedPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Le nouveau mot de passe doit etre different de l ancien'
+      });
+    }
+
+    const changedAt = new Date();
     await User.updatePassword(resetRequest.user_id, newPassword);
     await User.markPasswordResetTokenUsed(token);
     await User.invalidatePasswordResetTokens(resetRequest.user_id);
+    await User.invalidateEmailVerificationTokens(resetRequest.user_id);
     await User.invalidateAllSessions(resetRequest.user_id);
+    securityMonitor.trackPasswordResetCompletion(
+      user.id,
+      user.email,
+      req.ip,
+      req.get('User-Agent'),
+      'reset-link'
+    );
+    await AuthController.notifyPasswordChanged(user, req, changedAt);
 
     return res.json({
       success: true,

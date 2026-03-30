@@ -2,14 +2,30 @@ const { getAuthCookieName } = require('./security');
 
 const SENSITIVE_KEYS = new Set([
   'password',
-  'newPassword',
+  'newpassword',
+  'currentpassword',
+  'confirmpassword',
   'token',
-  'sessionToken',
-  'csrfToken',
+  'resettoken',
+  'verificationtoken',
+  'sessiontoken',
+  'csrftoken',
   'x-csrf-token',
   'authorization',
   'cookie'
 ]);
+
+const isSensitiveKey = (key = '') => {
+  const normalizedKey = `${key}`.trim().toLowerCase();
+  return (
+    SENSITIVE_KEYS.has(normalizedKey) ||
+    normalizedKey.includes('password') ||
+    normalizedKey.includes('token') ||
+    normalizedKey.includes('authorization') ||
+    normalizedKey.includes('cookie') ||
+    normalizedKey.includes('csrf')
+  );
+};
 
 const maskValue = (value) => {
   if (typeof value !== 'string') {
@@ -21,6 +37,17 @@ const maskValue = (value) => {
   }
 
   return `${value.slice(0, 4)}...[REDACTED]`;
+};
+
+const sanitizeTextForLogging = (value, maxLength = 500) =>
+  `${value || ''}`.replace(/[\u0000-\u001F\u007F]/g, ' ').slice(0, maxLength);
+
+const decodeURIComponentSafe = (value = '') => {
+  try {
+    return decodeURIComponent(value);
+  } catch (error) {
+    return value;
+  }
 };
 
 const sanitizeObject = (value) => {
@@ -38,7 +65,7 @@ const sanitizeObject = (value) => {
 
   return Object.fromEntries(
     Object.entries(value).map(([key, currentValue]) => {
-      if (SENSITIVE_KEYS.has(key)) {
+      if (isSensitiveKey(key)) {
         return [key, maskValue(currentValue)];
       }
 
@@ -97,6 +124,50 @@ const getAuthToken = (req) => {
   return cookies[authCookieName] || null;
 };
 
+const sanitizeUrlForLogging = (url = '') => {
+  const normalizedUrl = sanitizeTextForLogging(url, 2048);
+  const hashIndex = normalizedUrl.indexOf('#');
+  const baseUrl = hashIndex === -1 ? normalizedUrl : normalizedUrl.slice(0, hashIndex);
+  const fragment = hashIndex === -1 ? '' : normalizedUrl.slice(hashIndex + 1);
+  const queryIndex = baseUrl.indexOf('?');
+
+  if (queryIndex === -1) {
+    return normalizedUrl;
+  }
+
+  const path = baseUrl.slice(0, queryIndex);
+  const queryString = baseUrl.slice(queryIndex + 1);
+  const sanitizedQuery = queryString
+    .split('&')
+    .filter(Boolean)
+    .slice(0, 50)
+    .map((pair) => {
+      const separatorIndex = pair.indexOf('=');
+      const rawKey = separatorIndex === -1 ? pair : pair.slice(0, separatorIndex);
+      const rawValue = separatorIndex === -1 ? '' : pair.slice(separatorIndex + 1);
+      const key = sanitizeTextForLogging(decodeURIComponentSafe(rawKey), 120);
+
+      if (!key) {
+        return '';
+      }
+
+      if (isSensitiveKey(key)) {
+        return `${key}=[REDACTED]`;
+      }
+
+      const value = sanitizeTextForLogging(decodeURIComponentSafe(rawValue), 200);
+      return separatorIndex === -1 ? key : `${key}=${value}`;
+    })
+    .filter(Boolean)
+    .join('&');
+
+  const sanitizedFragment = fragment
+    ? `#${sanitizeTextForLogging(fragment, 120)}`
+    : '';
+
+  return `${path}${sanitizedQuery ? `?${sanitizedQuery}` : ''}${sanitizedFragment}`;
+};
+
 const createRequestLog = (req) => {
   return {
     method: req.method,
@@ -110,5 +181,6 @@ const createRequestLog = (req) => {
 module.exports = {
   createRequestLog,
   getAuthToken,
-  parseCookies
+  parseCookies,
+  sanitizeUrlForLogging
 };

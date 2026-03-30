@@ -15,6 +15,7 @@ const militaryJWT = require('../utils/militaryJWT');
 const securityMonitor = require('../utils/securityMonitor');
 const User = require('../models/User');
 const { getCookieOptions } = require('../utils/security');
+const { createRequestLog, sanitizeUrlForLogging } = require('../utils/request');
 
 describe('Backend security and stability', () => {
   afterEach(() => {
@@ -98,6 +99,63 @@ describe('Backend security and stability', () => {
     expect(cookieOptions.path).toBe('/');
   });
 
+  test('Development CORS defaults allow common frontend fallback ports', () => {
+    const previousValues = {
+      FRONTEND_URL: process.env.FRONTEND_URL,
+      ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
+      NODE_ENV: process.env.NODE_ENV
+    };
+
+    delete process.env.FRONTEND_URL;
+    delete process.env.ALLOWED_ORIGINS;
+    process.env.NODE_ENV = 'development';
+
+    jest.resetModules();
+    const { getAllowedOrigins: getAllowedOriginsWithDefaults } = require('../utils/security');
+    const allowedOrigins = getAllowedOriginsWithDefaults();
+
+    expect(allowedOrigins).toEqual(
+      expect.arrayContaining([
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:5173',
+        'http://127.0.0.1:3001'
+      ])
+    );
+
+    process.env.FRONTEND_URL = previousValues.FRONTEND_URL;
+    process.env.ALLOWED_ORIGINS = previousValues.ALLOWED_ORIGINS;
+    process.env.NODE_ENV = previousValues.NODE_ENV;
+  });
+
+  test('Development allowed origins keep localhost fallback ports even when FRONTEND_URL is configured', () => {
+    const previousValues = {
+      FRONTEND_URL: process.env.FRONTEND_URL,
+      ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
+      NODE_ENV: process.env.NODE_ENV
+    };
+
+    process.env.NODE_ENV = 'development';
+    process.env.FRONTEND_URL = 'http://192.168.10.41:3000';
+    process.env.ALLOWED_ORIGINS = 'http://192.168.10.41:3000';
+
+    jest.resetModules();
+    const { getAllowedOrigins: getAllowedOriginsWithConfiguredDevOrigin } = require('../utils/security');
+    const allowedOrigins = getAllowedOriginsWithConfiguredDevOrigin();
+
+    expect(allowedOrigins).toEqual(
+      expect.arrayContaining([
+        'http://192.168.10.41:3000',
+        'http://localhost:3001',
+        'http://127.0.0.1:3001'
+      ])
+    );
+
+    process.env.FRONTEND_URL = previousValues.FRONTEND_URL;
+    process.env.ALLOWED_ORIGINS = previousValues.ALLOWED_ORIGINS;
+    process.env.NODE_ENV = previousValues.NODE_ENV;
+  });
+
   test('Database SSL config can be disabled explicitly', async () => {
     const previousValues = {
       DB_SSL: process.env.DB_SSL,
@@ -143,6 +201,37 @@ describe('Backend security and stability', () => {
     process.env.NODE_ENV = previousValues.NODE_ENV;
     process.env.DB_SSL = previousValues.DB_SSL;
     process.env.DB_SSL_REJECT_UNAUTHORIZED = previousValues.DB_SSL_REJECT_UNAUTHORIZED;
+  });
+
+  test('Database config supports a remote PostgreSQL DATABASE_URL', async () => {
+    const previousValues = {
+      DATABASE_URL: process.env.DATABASE_URL,
+      DB_SSL: process.env.DB_SSL,
+      DB_SSL_REJECT_UNAUTHORIZED: process.env.DB_SSL_REJECT_UNAUTHORIZED,
+      NODE_ENV: process.env.NODE_ENV
+    };
+
+    process.env.NODE_ENV = 'production';
+    process.env.DATABASE_URL = 'postgresql://remote_user:secret@10.10.10.3:5432/ytech_remote';
+    process.env.DB_SSL = 'true';
+    process.env.DB_SSL_REJECT_UNAUTHORIZED = 'false';
+
+    jest.resetModules();
+    const database = require('../config/database');
+
+    expect(database.poolConfig.connectionString).toBe(
+      'postgresql://remote_user:secret@10.10.10.3:5432/ytech_remote'
+    );
+    expect(database.poolConfig.ssl).toEqual({
+      require: true,
+      rejectUnauthorized: false
+    });
+    await database.close();
+
+    process.env.DATABASE_URL = previousValues.DATABASE_URL;
+    process.env.DB_SSL = previousValues.DB_SSL;
+    process.env.DB_SSL_REJECT_UNAUTHORIZED = previousValues.DB_SSL_REJECT_UNAUTHORIZED;
+    process.env.NODE_ENV = previousValues.NODE_ENV;
   });
 
   test('Authentication middleware accepts tokens signed by militaryJWT', async () => {
@@ -271,6 +360,181 @@ describe('Backend security and stability', () => {
     process.env.EMAIL_FROM_ADDRESS = previousValues.EMAIL_FROM_ADDRESS;
   });
 
+  test('Authenticated users can request a password change link for their own email', async () => {
+    const agent = request.agent(app);
+    const csrfResponse = await agent
+      .get('/api/auth/csrf-token')
+      .set('Origin', 'http://localhost:3000');
+
+    jest.spyOn(militaryJWT, 'verifySecureToken').mockReturnValue({
+      id: 77,
+      sid: 'session-77',
+      iat: Math.floor(Date.now() / 1000),
+      role: 'admin',
+      email: 'admin@ytech.ma'
+    });
+    jest.spyOn(User, 'findSessionByToken').mockResolvedValue({
+      user_id: 77,
+      session_token: 'session-77'
+    });
+    jest.spyOn(User, 'touchSession').mockResolvedValue(true);
+    jest.spyOn(User, 'findById').mockResolvedValue({
+      id: 77,
+      name: 'YTECH Admin',
+      email: 'admin@ytech.ma',
+      role: 'admin',
+      is_active: true,
+      password_changed_at: null
+    });
+    jest.spyOn(User, 'invalidatePasswordResetTokens').mockResolvedValue(true);
+    const storePasswordResetTokenSpy = jest
+      .spyOn(User, 'storePasswordResetToken')
+      .mockResolvedValue({ id: 10 });
+
+    const response = await agent
+      .post('/api/auth/request-password-change')
+      .set('Origin', 'http://localhost:3000')
+      .set('User-Agent', 'jest-security-suite')
+      .set('Authorization', 'Bearer auth-request-password-change')
+      .set('X-CSRF-Token', csrfResponse.body.csrfToken)
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.email).toBe('admin@ytech.ma');
+    expect(response.body.resetToken).toBeNull();
+    expect(response.body).toHaveProperty('resetUrl');
+    expect(storePasswordResetTokenSpy).toHaveBeenCalledWith(
+      77,
+      expect.any(String),
+      expect.objectContaining({
+        ipAddress: expect.any(String),
+        expiresAt: expect.any(Date)
+      })
+    );
+  });
+
+  test('Authenticated password change invalidates previous sessions and returns a fresh session', async () => {
+    const agent = request.agent(app);
+    const csrfResponse = await agent
+      .get('/api/auth/csrf-token')
+      .set('Origin', 'http://localhost:3000');
+
+    const currentPasswordHash = await bcrypt.hash('AncienMot#2026', 4);
+    const verifySecureTokenSpy = jest.spyOn(militaryJWT, 'verifySecureToken').mockReturnValue({
+      id: 88,
+      sid: 'session-88',
+      iat: Math.floor(Date.now() / 1000),
+      role: 'client',
+      email: 'client@ytech.ma'
+    });
+    const revokeTokenSpy = jest.spyOn(militaryJWT, 'revokeToken').mockReturnValue(true);
+
+    jest.spyOn(User, 'findSessionByToken').mockResolvedValue({
+      user_id: 88,
+      session_token: 'session-88'
+    });
+    jest.spyOn(User, 'touchSession').mockResolvedValue(true);
+    jest.spyOn(User, 'findById').mockImplementation(async (id, options = {}) => {
+      if (options.includePassword) {
+        return {
+          id: 88,
+          name: 'Client Secure',
+          email: 'client@ytech.ma',
+          role: 'client',
+          is_active: true,
+          password: currentPasswordHash,
+          password_changed_at: null
+        };
+      }
+
+      return {
+        id: 88,
+        name: 'Client Secure',
+        email: 'client@ytech.ma',
+        role: 'client',
+        is_active: true,
+        password_changed_at: null
+      };
+    });
+
+    const updatePasswordSpy = jest.spyOn(User, 'updatePassword').mockResolvedValue(true);
+    const invalidatePasswordResetTokensSpy = jest
+      .spyOn(User, 'invalidatePasswordResetTokens')
+      .mockResolvedValue(true);
+    const invalidateEmailVerificationTokensSpy = jest
+      .spyOn(User, 'invalidateEmailVerificationTokens')
+      .mockResolvedValue(true);
+    const invalidateAllSessionsSpy = jest
+      .spyOn(User, 'invalidateAllSessions')
+      .mockResolvedValue(true);
+    const createSessionSpy = jest.spyOn(User, 'createSession').mockResolvedValue({ id: 900 });
+
+    const response = await agent
+      .post('/api/auth/change-password')
+      .set('Origin', 'http://localhost:3000')
+      .set('User-Agent', 'jest-security-suite')
+      .set('Authorization', 'Bearer auth-change-password')
+      .set('X-CSRF-Token', csrfResponse.body.csrfToken)
+      .send({
+        currentPassword: 'AncienMot#2026',
+        newPassword: 'NouveauMot#2026'
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.user.email).toBe('client@ytech.ma');
+    expect(updatePasswordSpy).toHaveBeenCalledWith(88, 'NouveauMot#2026');
+    expect(invalidatePasswordResetTokensSpy).toHaveBeenCalledWith(88);
+    expect(invalidateEmailVerificationTokensSpy).toHaveBeenCalledWith(88);
+    expect(invalidateAllSessionsSpy).toHaveBeenCalledWith(88);
+    expect(createSessionSpy).toHaveBeenCalledWith(
+      88,
+      expect.any(String),
+      expect.any(String),
+      'jest-security-suite'
+    );
+    expect(revokeTokenSpy).toHaveBeenCalledWith('auth-change-password');
+    expect(invalidateAllSessionsSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      createSessionSpy.mock.invocationCallOrder[0]
+    );
+    expect(verifySecureTokenSpy).toHaveBeenCalledWith('auth-change-password');
+  });
+
+  test('Request logging redacts password and token fields before persistence', () => {
+    const requestLog = createRequestLog({
+      method: 'POST',
+      path: '/api/auth/change-password',
+      ip: '127.0.0.1',
+      query: {
+        token: 'plain-reset-token'
+      },
+      body: {
+        currentPassword: 'AncienMot#2026',
+        newPassword: 'NouveauMot#2026',
+        nested: {
+          verificationToken: 'email-token'
+        }
+      }
+    });
+
+    expect(requestLog.query.token).toContain('[REDACTED]');
+    expect(requestLog.body.currentPassword).toContain('[REDACTED]');
+    expect(requestLog.body.newPassword).toContain('[REDACTED]');
+    expect(requestLog.body.nested.verificationToken).toContain('[REDACTED]');
+  });
+
+  test('URL logging redacts sensitive query parameters', () => {
+    const sanitizedUrl = sanitizeUrlForLogging(
+      '/api/auth/verify-email?token=verification-token&next=%2Fdashboard&mode=fast'
+    );
+
+    expect(sanitizedUrl).toContain('token=[REDACTED]');
+    expect(sanitizedUrl).toContain('next=/dashboard');
+    expect(sanitizedUrl).toContain('mode=fast');
+    expect(sanitizedUrl).not.toContain('verification-token');
+  });
+
   test('Registration keeps the raw password flow and requires email verification before login', async () => {
     const agent = request.agent(app);
     const csrfResponse = await agent
@@ -372,6 +636,7 @@ describe('Backend security and stability', () => {
   });
 
   test('Email verification endpoint marks the user as verified', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     jest.spyOn(User, 'findValidEmailVerificationToken').mockResolvedValue({
       user_id: 301
     });
@@ -392,6 +657,13 @@ describe('Backend security and stability', () => {
     expect(markEmailVerifiedSpy).toHaveBeenCalledWith(301);
     expect(markTokenUsedSpy).toHaveBeenCalledWith('verification-token');
     expect(invalidateTokensSpy).toHaveBeenCalledWith(301);
+
+    const auditLogCall = consoleLogSpy.mock.calls.find(
+      ([message]) => message === '[SECURITY AUDIT]'
+    );
+
+    expect(auditLogCall?.[1]).toContain('/api/auth/verify-email?token=[REDACTED]');
+    expect(auditLogCall?.[1]).not.toContain('verification-token');
   });
 
   test('Chatbot route blocks sensitive requests before reaching Ollama', async () => {

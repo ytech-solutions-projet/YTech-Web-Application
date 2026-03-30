@@ -402,6 +402,9 @@ Thumbs.db
 
 .env
 .env.*
+!.dockerignore
+!backend/.env.production.example
+!frontend/.env.production.example
 node_modules/
 frontend/build/
 frontend/dist/

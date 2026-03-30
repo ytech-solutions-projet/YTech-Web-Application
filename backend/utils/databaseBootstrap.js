@@ -3,6 +3,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const database = require('../config/database');
 const { normalizePhone } = require('./phone');
+const { parseBoolean } = require('./security');
 
 const ADMIN_DEFAULTS = {
   name: 'YTECH Admin',
@@ -301,6 +302,9 @@ const getAdminSeedConfig = () => {
   };
 };
 
+const shouldForceAdminSeedPasswordReset = () =>
+  parseBoolean(process.env.FORCE_ADMIN_SEED_PASSWORD_RESET, false);
+
 const ensureSchema = async () => {
   const userColumns = await getTableColumns('users');
   if (userColumns.size === 0) {
@@ -377,16 +381,17 @@ const ensureAdminAccount = async (userColumns) => {
     };
   }
 
-  const bcryptRounds = Number.parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
-  const passwordHash = await bcrypt.hash(adminSeed.password, bcryptRounds);
   const existingAdmin = await database.query(
-    'SELECT id FROM users WHERE email = $1',
+    'SELECT id, password FROM users WHERE email = $1',
     [adminSeed.email]
   );
-
   const hasCompanyColumn = userColumns.has('company');
+  const hasUpdatedAtColumn = userColumns.has('updated_at');
+  const hasPasswordChangedAtColumn = userColumns.has('password_changed_at');
 
   if (existingAdmin.length === 0) {
+    const bcryptRounds = Number.parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
+    const passwordHash = await bcrypt.hash(adminSeed.password, bcryptRounds);
     const columns = ['name', 'email', 'password', 'phone', 'role', 'is_active', 'email_verified'];
     const values = [
       adminSeed.name,
@@ -415,37 +420,45 @@ const ensureAdminAccount = async (userColumns) => {
     };
   }
 
-  const updates = [
-    'name = $1',
-    'password = $2',
-    'phone = $3',
-    hasCompanyColumn ? 'company = $4' : null,
-    hasCompanyColumn ? 'role = $5' : 'role = $4',
-    hasCompanyColumn ? 'is_active = $6' : 'is_active = $5',
-    hasCompanyColumn ? 'email_verified = $7' : 'email_verified = $6',
-    'updated_at = NOW()'
-  ].filter(Boolean);
+  const shouldUpdatePassword =
+    shouldForceAdminSeedPasswordReset() || !existingAdmin[0]?.password;
+  const updates = [];
+  const values = [];
 
-  const values = hasCompanyColumn
-    ? [
-        adminSeed.name,
-        passwordHash,
-        adminSeed.phone,
-        adminSeed.company || null,
-        'admin',
-        true,
-        true,
-        adminSeed.email
-      ]
-    : [
-        adminSeed.name,
-        passwordHash,
-        adminSeed.phone,
-        'admin',
-        true,
-        true,
-        adminSeed.email
-      ];
+  updates.push(`name = $${values.length + 1}`);
+  values.push(adminSeed.name);
+
+  if (shouldUpdatePassword) {
+    const bcryptRounds = Number.parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
+    const passwordHash = await bcrypt.hash(adminSeed.password, bcryptRounds);
+    updates.push(`password = $${values.length + 1}`);
+    values.push(passwordHash);
+
+    if (hasPasswordChangedAtColumn) {
+      updates.push('password_changed_at = NOW()');
+    }
+  }
+
+  updates.push(`phone = $${values.length + 1}`);
+  values.push(adminSeed.phone);
+
+  if (hasCompanyColumn) {
+    updates.push(`company = $${values.length + 1}`);
+    values.push(adminSeed.company || null);
+  }
+
+  updates.push(`role = $${values.length + 1}`);
+  values.push('admin');
+  updates.push(`is_active = $${values.length + 1}`);
+  values.push(true);
+  updates.push(`email_verified = $${values.length + 1}`);
+  values.push(true);
+
+  if (hasUpdatedAtColumn) {
+    updates.push('updated_at = NOW()');
+  }
+
+  values.push(adminSeed.email);
 
   await database.execute(
     `UPDATE users SET ${updates.join(', ')} WHERE email = $${values.length}`,
@@ -454,7 +467,8 @@ const ensureAdminAccount = async (userColumns) => {
 
   return {
     ...adminSeed,
-    created: false
+    created: false,
+    passwordUpdated: shouldUpdatePassword
   };
 };
 

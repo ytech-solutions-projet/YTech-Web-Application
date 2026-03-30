@@ -21,8 +21,10 @@ const resolveAuthenticatedRequest = async (req) => {
     return null;
   }
 
-  const passwordChangedAt = user.password_changed_at ? new Date(user.password_changed_at).getTime() : 0;
-  const tokenIssuedAt = Number.isFinite(decoded.iat) ? decoded.iat * 1000 : 0;
+  const passwordChangedAt = user.password_changed_at
+    ? Math.floor(new Date(user.password_changed_at).getTime() / 1000)
+    : 0;
+  const tokenIssuedAt = Number.isFinite(Number(decoded.iat)) ? Number(decoded.iat) : 0;
 
   if (passwordChangedAt && tokenIssuedAt && tokenIssuedAt < passwordChangedAt) {
     return null;

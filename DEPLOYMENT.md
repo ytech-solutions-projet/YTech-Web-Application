@@ -1,338 +1,290 @@
-# 🚀 YTECH - Guide de Déploiement
+# YTECH Deployment Guide
 
-## 📋 **Prérequis**
+Ce projet est maintenant pense en priorite pour cette architecture:
 
-### 🛠️ **Logiciels Requis**
-- **Node.js** 20.19+ et npm 10+ pour builder le frontend et deployer l application
-- **XAMPP** (Apache + MariaDB)
-- **Python** 3.8+ (optionnel pour chatbot)
-- **Git** pour le versioning
+- serveur web/app Ubuntu
+- frontend build statique servi par Nginx
+- backend Node.js sur le meme serveur web
+- PostgreSQL sur un autre serveur, accessible via reseau prive ou regles firewall strictes
+- serveur web avec 2 interfaces/IP:
+- une IP bridge ou publique pour les utilisateurs
+- une IP privee pour parler au serveur PostgreSQL
+- serveur PostgreSQL avec IP fixe
 
-### 🔧 **Configuration Système**
-- **RAM** : 4GB minimum
-- **Stockage** : 10GB disponible
-- **OS** : Windows 10/11, macOS, Linux
+## Architecture recommandee
 
----
-
-## 🗄️ **Configuration Base de Données**
-
-### 1. **Démarrer MariaDB**
-```bash
-# Ouvrir XAMPP Control Panel
-# Démarrer Apache et MariaDB
+```text
+Internet
+  |
+  v
+Nginx (Ubuntu web server - public/bridge IP)
+  |- /           -> frontend build
+  |- /api        -> backend Node.js (127.0.0.1:5001)
+  |
+  v
+PostgreSQL remote server (fixed private IP, ex: 10.10.10.3:5432)
 ```
 
-### 2. **Créer la Base de Données**
-```sql
--- Via phpMyAdmin (http://localhost/phpmyadmin)
-CREATE DATABASE ytech_pro CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+## Hypotheses de production
+
+- le backend ecoute en local sur `127.0.0.1:5001`
+- Nginx expose publiquement le site et reverse-proxy `/api`
+- la base n est pas sur le meme serveur que l application
+- le serveur web dispose d une interface/IP publique et d une interface/IP privee
+- la connexion PostgreSQL sort par l interface/IP privee du serveur web
+- les URLs publiques sont definies par variables d environnement
+- les cookies securises sont utilises en HTTPS
+
+## 1. Preparation du serveur Ubuntu web/app
+
+Installer les composants principaux:
+
+```bash
+sudo apt update
+sudo apt install -y git nginx curl ca-certificates
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
 ```
 
-### 3. **Importer le Schéma**
+Verifications:
+
 ```bash
-# Le schéma est créé automatiquement au premier démarrage
-# Voir backend/config/database.js
+node -v
+npm -v
+nginx -v
 ```
 
----
+## 2. Preparation du depot
 
-## 🔧 **Configuration Backend**
-
-### 1. **Installation Dépendances**
 ```bash
-cd backend
-npm install --production
+cd /var/www
+sudo git clone https://github.com/ytech-solutions-projet/YTech-Web-Application.git ytech
+sudo chown -R www-data:www-data /var/www/ytech
+cd /var/www/ytech
 ```
 
-### 2. **Configuration Variables**
-```bash
-# Copier le fichier d'environnement
-cp .env.example .env
+## 3. Configuration backend
 
-# Éditer .env avec vos valeurs
+Le fichier modele est `backend/.env.production.example`.
+
+Creer le vrai fichier:
+
+```bash
+cd /var/www/ytech/backend
+cp .env.production.example .env
 nano .env
 ```
 
-### 3. **Variables Essentielles**
+Variables importantes pour une base distante:
+
 ```env
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=ytech_pro
-JWT_SECRET=votre-secret-super-securise
-```
-
-### 4. **Démarrer le Backend**
-```bash
-# Développement
-npm run dev
-
-# Production
-npm start
-```
-
----
-
-## 🎨 **Configuration Frontend**
-
-### 1. **Installation Dépendances**
-```bash
-cd frontend
-npm install
-```
-
-### 2. **Configuration Variables**
-```bash
-# Créer .env.local
-echo "REACT_APP_API_URL=http://localhost:5000/api" > .env.local
-```
-
-### 3. **Démarrer le Frontend**
-```bash
-# Développement
-npm start
-
-# Build pour production
-npm run build
-```
-
----
-
-## 🤖 **Configuration Chatbot (Optionnel)**
-
-### 1. **Installation Python**
-```bash
-# Vérifier Python 3.8+
-python --version
-
-# Installer dépendances
-cd chatbot
-pip install -r requirements.txt
-```
-
-### 2. **Démarrer le Chatbot**
-```bash
-python app.py
-```
-
----
-
-## 🌐 **Accès Application**
-
-| Service | URL | Port | Description |
-|---------|------|------|-------------|
-| **Frontend** | http://localhost:3000 | 3000 | Interface utilisateur |
-| **Backend API** | http://localhost:5000 | 5000 | Services REST |
-| **Base de données** | http://localhost/phpmyadmin | 80 | Administration MariaDB |
-| **Chatbot** | http://localhost:5001 | 5001 | Assistant IA |
-
----
-
-## 🔐 **Configuration Sécurité**
-
-### 🛡️ **Production**
-```env
-# .env pour production
 NODE_ENV=production
-JWT_SECRET=votre-secret-jwt-tres-long-et-complexe
-SESSION_SECRET=votre-secret-session-tres-long-et-complexe
+HOST=127.0.0.1
+PORT=5001
+
+FRONTEND_URL=https://app.example.com
+PUBLIC_API_URL=https://app.example.com/api
+ALLOWED_ORIGINS=https://app.example.com
+
+DB_HOST=10.10.10.3
+DB_PORT=5432
+DB_NAME=ytech_db
+DB_USER=ytech_user
+DB_PASSWORD=change-me
+DB_SSL=true
+DB_SSL_REJECT_UNAUTHORIZED=true
+
+JWT_SECRET=replace-with-a-long-random-secret
+SESSION_SECRET=replace-with-another-long-random-secret
+AUTH_COOKIE_SECURE=true
+AUTH_COOKIE_SAME_SITE=strict
+TRUST_PROXY=true
 ```
 
-### 📊 **Rate Limiting**
-```javascript
-// Configuration dans server.js
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Maximum 5 tentatives
-  message: 'Trop de tentatives. Réessayez plus tard.'
-});
-```
+Notes:
 
----
+- `HOST=127.0.0.1` limite l acces direct au backend et laisse Nginx faire l exposition publique.
+- `DB_HOST` doit pointer vers le serveur PostgreSQL distant.
+- `DB_HOST` doit etre joignable depuis l interface/IP privee du serveur web, pas via l IP publique.
+- `DB_SSL=true` est recommande si la base est sur un autre serveur.
+- si ton hebergeur fournit une URL complete, tu peux utiliser `DATABASE_URL` a la place de `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`.
 
-## 📊 **Monitoring**
+## 4. Configuration frontend
 
-### 🔍 **Health Check**
+Le fichier modele est `frontend/.env.production.example`.
+
+Creer le vrai fichier:
+
 ```bash
-# Vérifier l'état du backend
-curl http://localhost:5000/api/health
+cd /var/www/ytech/frontend
+cp .env.production.example .env
+nano .env
 ```
 
-### 📋 **Logs**
-```bash
-# Logs backend dans console
-# Logs erreurs dans fichiers (production)
-tail -f logs/error.log
+Configuration recommandee derriere Nginx:
+
+```env
+REACT_APP_ENV=production
+REACT_APP_API_URL=
 ```
 
----
+Laisser `REACT_APP_API_URL` vide est recommande si le frontend et l API sont servis sous le meme domaine avec `/api` reverse-proxy par Nginx.
 
-## 🚀 **Déploiement Production**
+## 5. Installation et build
 
-### 1. **Préparation Backend**
+Backend:
+
 ```bash
-# Build production
+cd /var/www/ytech/backend
+npm ci --omit=dev
+```
+
+Frontend:
+
+```bash
+cd /var/www/ytech/frontend
+npm ci
 npm run build
-
-# Installation dépendances
-npm ci --production
 ```
 
-### 2. **Préparation Frontend**
+## 6. Service systemd backend
+
+Exemple:
+
+```ini
+[Unit]
+Description=YTECH Backend API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/ytech/backend
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+EnvironmentFile=-/var/www/ytech/backend/.env
+ExecStart=/usr/bin/node /var/www/ytech/backend/server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Activation:
+
 ```bash
-# Build production
-npm run build
-
-# Le build est dans ./build
+sudo systemctl daemon-reload
+sudo systemctl enable --now ytech-backend
+sudo systemctl status ytech-backend
 ```
 
-### 3. **Configuration Serveur**
-```bash
-# Utiliser PM2 pour la gestion de processus
-npm install -g pm2
+## 7. Configuration Nginx
 
-# Démarrer avec PM2
-pm2 start backend/server.js --name "ytech-backend"
-pm2 start frontend/build --name "ytech-frontend" --spa
-```
+Exemple minimal:
 
-### 4. **Configuration Nginx (Recommandé)**
 ```nginx
 server {
     listen 80;
-    server_name votre-domaine.com;
-    
-    # Frontend
-    location / {
-        root /path/to/frontend/build;
-        try_files $uri $uri/ /index.html;
-    }
-    
-    # Backend API
-    location /api {
-        proxy_pass http://localhost:5000;
+    server_name app.example.com;
+
+    root /var/www/ytech/frontend/build;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:5001;
+        proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location /assets/ {
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
     }
 }
 ```
 
----
+Validation:
 
-## 🧪 **Tests de Déploiement**
-
-### ✅ **Vérifications**
 ```bash
-# 1. Base de données connectée
-curl http://localhost:5000/api/health
-
-# 2. Frontend accessible
-curl http://localhost:3000
-
-# 3. API fonctionnelle
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"<admin-email>","password":"<admin-password>"}'
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
-### 📊 **Tests Intégration**
-```bash
-# Test inscription
-curl -X POST http://localhost:5000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test","email":"test@ytech.ma","password":"Test123!","phone":"0612345678"}'
+## 8. Acces reseau vers PostgreSQL
 
-# Vérifier utilisateur créé
-psql -d ytech_db -c "SELECT id, email, role FROM users;"
+Sur le serveur base de donnees:
+
+- autoriser uniquement l IP privee du serveur web/app
+- restreindre le port `5432`
+- activer SSL si possible
+- creer un utilisateur dedie a l application
+
+Exemple conceptuel:
+
+```text
+Web/App public IP:  192.168.1.16
+Web/App private IP: 10.10.10.2
+DB server fixed IP: 10.10.10.3
+Rule:               allow 10.10.10.2 -> 10.10.10.3:5432
 ```
 
----
+## 9. Verification apres deploiement
 
-## 🔧 **Maintenance**
+Backend:
 
-### 📅 **Tâches Régulières**
 ```bash
-# 1. Sauvegardes base de données
-mysqldump -u root -p ytech_pro > backup_$(date +%Y%m%d).sql
-
-# 2. Nettoyage logs
-find logs/ -name "*.log" -mtime +30 -delete
-
-# 3. Mise à jour dépendances
-npm update
+curl http://127.0.0.1:5001/api/health
 ```
 
-### 🔄 **Redémarrage Services**
+Nginx public:
+
 ```bash
-# Redémarrer backend
-pm2 restart ytech-backend
-
-# Redémarrer frontend
-pm2 restart ytech-frontend
-
-# Redémarrer MariaDB (XAMPP)
-# Via panneau de contrôle XAMPP
+curl -I https://app.example.com
+curl -I https://app.example.com/api/health
 ```
 
----
+Logs:
 
-## 📞 **Support Technique**
+```bash
+sudo journalctl -u ytech-backend -n 100 --no-pager
+sudo tail -f /var/log/nginx/access.log
+sudo tail -f /var/log/nginx/error.log
+```
 
-### 🐛 **Problèmes Communs**
+## 10. Deploiement via le script fourni
 
-1. **Port déjà utilisé**
-   ```bash
-   # Trouver le processus
-   netstat -ano | findstr :5000
-   
-   # Tuer le processus
-   taskkill /PID <PID> /F
-   ```
+Le script `deploy.sh` est aligne avec cette approche:
 
-2. **Connexion base de données refusée**
-   ```bash
-   # Vérifier MariaDB démarré
-   # Vérifier identifiants dans .env
-   # Vérifier nom base de données
-   ```
+- backend systemd
+- frontend build statique
+- Nginx en frontal
+- backend local sur `127.0.0.1`
 
-3. **Permissions refusées**
-   ```bash
-   # Exécuter en administrateur
-   # Ou vérifier permissions fichiers
-   ```
+Sequence typique:
 
-### 📧 **Contact Support**
-- **Email** : support@ytech.ma
-- **Téléphone** : +212 5XX XXX XXX
-- **Documentation** : https://docs.ytech.ma
+```bash
+cd /var/www/ytech
+sudo ./deploy.sh
+```
 
----
+## Points de vigilance
 
-## 🎯 **Checklist Déploiement**
-
-### ✅ **Pré-déploiement**
-- [ ] Base de données créée
-- [ ] Variables environnement configurées
-- [ ] Dépendances installées
-- [ ] Tests locaux passés
-
-### ✅ **Déploiement**
-- [ ] Backend démarré
-- [ ] Frontend build et déployé
-- [ ] Chatbot configuré (optionnel)
-- [ ] Nginx configuré (production)
-
-### ✅ **Post-déploiement**
-- [ ] Health check OK
-- [ ] Tests intégration passés
-- [ ] Monitoring configuré
-- [ ] Sauvegardes automatiques
-
----
-
-<div align="center">
-  <p>🇲🇦 **YTECH - Déploiement Professionnel** 🇲🇦</p>
-  <p>🚀 Prêt pour Production • 🛡️ Sécurisé • 📊 Monitoré</p>
-</div>
+- ne mets pas `DB_HOST=localhost` si PostgreSQL est sur un autre serveur
+- ne laisse pas d IP privee codée en dur comme URL publique
+- renseigne `FRONTEND_URL`, `PUBLIC_API_URL` et `ALLOWED_ORIGINS` avec tes vraies URLs
+- active HTTPS avant de passer `AUTH_COOKIE_SECURE=true`
+- utilise des secrets longs et differents pour `JWT_SECRET` et `SESSION_SECRET`

@@ -19,6 +19,7 @@ import PaymentSuccessPage from './pages/PaymentSuccessPage';
 import DevisManagement from './pages/DevisManagement';
 import Messages from './pages/Messages';
 import AdminMessages from './pages/AdminMessages';
+import Settings from './pages/Settings';
 import Chatbot from './components/Chatbot';
 import { ensureCsrfToken, fetchJson } from './utils/http';
 import {
@@ -207,6 +208,12 @@ function App() {
             <Route path="/devis-management" element={
               <ProtectedRoute authReady={authReady} authUser={authUser}>
                 <DevisManagement />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/settings" element={
+              <ProtectedRoute authReady={authReady} authUser={authUser}>
+                <Settings />
               </ProtectedRoute>
             } />
             

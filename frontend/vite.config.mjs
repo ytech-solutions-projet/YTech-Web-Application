@@ -3,20 +3,35 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const DEV_SERVER_HOST = '192.168.10.41';
+const DEFAULT_DEV_API_HOST = 'localhost';
+const DEFAULT_DEV_API_PORT = 5001;
+const DEFAULT_FRONTEND_PORT = 3000;
 
 const packageJson = JSON.parse(
   readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8')
 );
 
+const resolveDevApiTarget = (env) => {
+  if (env.VITE_DEV_PROXY_TARGET) {
+    return env.VITE_DEV_PROXY_TARGET;
+  }
+
+  const apiHost = env.VITE_DEV_API_HOST || DEFAULT_DEV_API_HOST;
+  const apiPort = Number(env.VITE_DEV_API_PORT || DEFAULT_DEV_API_PORT);
+  return `http://${apiHost}:${apiPort}`;
+};
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const devApiTarget = resolveDevApiTarget(env);
+  const devApiUrl = new URL(devApiTarget);
+  const devWsProtocol = devApiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
   const processEnv = {
     NODE_ENV: mode,
     REACT_APP_VERSION: env.REACT_APP_VERSION || packageJson.version,
     REACT_APP_ENV: env.REACT_APP_ENV || mode,
     REACT_APP_API_URL: env.REACT_APP_API_URL || '',
-    REACT_APP_WS_URL: env.REACT_APP_WS_URL || `ws://${DEV_SERVER_HOST}:5001`,
+    REACT_APP_WS_URL: env.REACT_APP_WS_URL || `${devWsProtocol}//${devApiUrl.host}`,
     REACT_APP_CSRF_COOKIE_NAME: env.REACT_APP_CSRF_COOKIE_NAME || 'ytech_csrf'
   };
 
@@ -28,10 +43,10 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: true,
-      port: Number(env.PORT || 3000),
+      port: Number(env.PORT || env.VITE_PORT || DEFAULT_FRONTEND_PORT),
       proxy: {
         '/api': {
-          target: env.VITE_DEV_PROXY_TARGET || `http://${DEV_SERVER_HOST}:5001`,
+          target: devApiTarget,
           changeOrigin: true
         }
       }
