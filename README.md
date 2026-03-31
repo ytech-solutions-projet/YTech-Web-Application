@@ -121,14 +121,62 @@ npm run dev -- --port 3001
 
 This repository now includes a local Docker Compose stack for the app and PostgreSQL.
 
+Requirements:
+
+- Docker Desktop or Docker Engine with Compose enabled
+- port `5001` available on the host
+
+Run steps:
+
+1. Copy the Docker environment file.
+
+PowerShell:
+
+```powershell
+Copy-Item .env.docker.example .env
+```
+
+Bash:
+
 ```bash
 cp .env.docker.example .env
+```
+
+2. Optionally edit `.env` if you want to change the local port, admin seed account or secrets.
+
+3. Start the stack.
+
+```bash
 docker compose up --build
 ```
 
-Then open:
+4. Open the application:
 
 - `http://localhost:5001`
+
+5. To run in detached mode:
+
+```bash
+docker compose up --build -d
+```
+
+6. To view logs:
+
+```bash
+docker compose logs -f
+```
+
+7. To stop the stack:
+
+```bash
+docker compose down
+```
+
+8. To stop the stack and delete the PostgreSQL volume:
+
+```bash
+docker compose down -v
+```
 
 The Docker setup uses:
 
