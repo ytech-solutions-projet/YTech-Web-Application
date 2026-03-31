@@ -400,6 +400,7 @@ class OWASPSecurityMiddleware {
       // Log response
       res.on('finish', () => {
         const responseTime = Date.now() - startTime;
+        const isHealthCheck = req.path === '/api/health';
         const securityLog = {
           ...logEntry,
           statusCode: res.statusCode,
@@ -408,15 +409,17 @@ class OWASPSecurityMiddleware {
         };
         
         // Log suspicious activities
-        if (res.statusCode >= 400) {
+        if (!isHealthCheck && res.statusCode >= 400) {
           this.logSecurityEvent('HTTP_ERROR', securityLog);
         }
         
-        if (responseTime > 5000) {
+        if (!isHealthCheck && responseTime > 5000) {
           this.logSecurityEvent('SLOW_REQUEST', securityLog);
         }
-        
-        console.log('[SECURITY AUDIT]', JSON.stringify(securityLog));
+
+        if (!isHealthCheck) {
+          console.log('[SECURITY AUDIT]', JSON.stringify(securityLog));
+        }
       });
       
       next();

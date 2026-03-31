@@ -302,9 +302,14 @@ app.get('/api/health', async (req, res) => {
   try {
     const isDbConnected = await database.testConnection();
     const payload = {
-      success: true,
-      status: 'Server is running',
+      success: isDbConnected,
+      status: isDbConnected ? 'healthy' : 'degraded',
+      server: 'running',
       database: isDbConnected ? 'Connected (PostgreSQL)' : 'Disconnected',
+      services: {
+        application: 'up',
+        database: isDbConnected ? 'up' : 'down'
+      },
       timestamp: new Date().toISOString()
     };
 
@@ -317,7 +322,7 @@ app.get('/api/health', async (req, res) => {
       };
     }
 
-    return res.json(payload);
+    return res.status(isDbConnected ? 200 : 503).json(payload);
   } catch (error) {
     return res.status(500).json({
       success: false,

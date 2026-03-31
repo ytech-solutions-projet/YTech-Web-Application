@@ -10,6 +10,7 @@ process.env.TRUST_PROXY = process.env.TRUST_PROXY || 'false';
 const request = require('supertest');
 const bcrypt = require('bcryptjs');
 const app = require('../server');
+const database = require('../config/database');
 const advancedSecurity = require('../middleware/advancedSecurity');
 const militaryJWT = require('../utils/militaryJWT');
 const securityMonitor = require('../utils/securityMonitor');
@@ -40,6 +41,34 @@ describe('Backend security and stability', () => {
     expect(response.headers['x-frame-options']).toBeDefined();
     expect(response.headers['x-content-type-options']).toBe('nosniff');
     expect(response.headers['content-security-policy']).toContain("default-src 'self'");
+  });
+
+  test('Health endpoint returns 200 when the database is connected', async () => {
+    jest.spyOn(database, 'testConnection').mockResolvedValue(true);
+
+    const response = await request(app).get('/api/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.status).toBe('healthy');
+    expect(response.body.services).toEqual({
+      application: 'up',
+      database: 'up'
+    });
+  });
+
+  test('Health endpoint returns 503 when the database is unavailable', async () => {
+    jest.spyOn(database, 'testConnection').mockResolvedValue(false);
+
+    const response = await request(app).get('/api/health');
+
+    expect(response.status).toBe(503);
+    expect(response.body.success).toBe(false);
+    expect(response.body.status).toBe('degraded');
+    expect(response.body.services).toEqual({
+      application: 'up',
+      database: 'down'
+    });
   });
 
   test('Rate limit middleware can be created without Redis', () => {

@@ -33,11 +33,11 @@ services:
       NODE_ENV: "${NODE_ENV:-production}"
       HOST: "${HOST:-0.0.0.0}"
       PORT: "${PORT:-5001}"
-      FRONTEND_URL: "${FRONTEND_URL:-http://localhost:5001}"
-      PUBLIC_API_URL: "${PUBLIC_API_URL:-http://localhost:5001/api}"
-      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:5001,http://127.0.0.1:5001}"
-      PASSWORD_RESET_BASE_URL: "${PASSWORD_RESET_BASE_URL:-http://localhost:5001}"
-      EMAIL_VERIFICATION_BASE_URL: "${EMAIL_VERIFICATION_BASE_URL:-http://localhost:5001}"
+      FRONTEND_URL: "${FRONTEND_URL:-http://${APP_PUBLIC_HOST:-localhost}:${APP_PORT:-5001}}"
+      PUBLIC_API_URL: "${PUBLIC_API_URL:-http://${APP_PUBLIC_HOST:-localhost}:${APP_PORT:-5001}/api}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://${APP_PUBLIC_HOST:-localhost}:${APP_PORT:-5001},http://localhost:${APP_PORT:-5001},http://127.0.0.1:${APP_PORT:-5001}}"
+      PASSWORD_RESET_BASE_URL: "${PASSWORD_RESET_BASE_URL:-http://${APP_PUBLIC_HOST:-localhost}:${APP_PORT:-5001}}"
+      EMAIL_VERIFICATION_BASE_URL: "${EMAIL_VERIFICATION_BASE_URL:-http://${APP_PUBLIC_HOST:-localhost}:${APP_PORT:-5001}}"
       DB_HOST: db
       DB_PORT: "5432"
       DB_NAME: "${DB_NAME:-ytech_db}"
@@ -56,6 +56,12 @@ services:
       ADMIN_SEED_PASSWORD: "${ADMIN_SEED_PASSWORD:-YtechLocalAdmin!2026}"
       ADMIN_SEED_PHONE: "${ADMIN_SEED_PHONE:-+212600000000}"
       ADMIN_SEED_COMPANY: "${ADMIN_SEED_COMPANY:-YTECH}"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:5001/api/health').then((response) => response.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1));\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   postgres_data:

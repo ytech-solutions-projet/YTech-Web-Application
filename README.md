@@ -142,7 +142,26 @@ Bash:
 cp .env.docker.example .env
 ```
 
-2. Optionally edit `.env` if you want to change the local port, admin seed account or secrets.
+2. Optionally edit `.env` if you want to change the local port, public host, admin seed account or secrets.
+
+Important variables for the web app endpoint:
+
+- `APP_PORT`: host port published by Docker
+- `APP_PUBLIC_HOST`: hostname or IP used by the browser
+- `FRONTEND_URL`: public web app URL
+- `PUBLIC_API_URL`: public API URL
+
+Example if you want the app on `http://192.168.1.20:8080`:
+
+```env
+APP_PORT=8080
+APP_PUBLIC_HOST=192.168.1.20
+FRONTEND_URL=http://192.168.1.20:8080
+PUBLIC_API_URL=http://192.168.1.20:8080/api
+ALLOWED_ORIGINS=http://192.168.1.20:8080,http://localhost:8080,http://127.0.0.1:8080
+PASSWORD_RESET_BASE_URL=http://192.168.1.20:8080
+EMAIL_VERIFICATION_BASE_URL=http://192.168.1.20:8080
+```
 
 3. Start the stack.
 
@@ -183,6 +202,7 @@ The Docker setup uses:
 - one `app` container built from the root [`Dockerfile`](./Dockerfile)
 - one `db` container based on PostgreSQL 16
 - automatic database bootstrapping through the existing backend startup flow
+- a real container healthcheck for the application and the database
 
 If you need different local ports, admin credentials or secrets, edit the copied `.env` file before running Compose.
 

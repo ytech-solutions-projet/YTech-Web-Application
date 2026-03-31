@@ -136,18 +136,21 @@ class SecurityMonitoringSystem {
     
     res.on('finish', () => {
       const responseTime = Date.now() - startTime;
+      const isHealthCheck = req.path === '/api/health';
       this.metrics.totalResponseTime += responseTime;
       
-      this.logPerformanceMetric('responseTime', responseTime, {
-        requestId,
-        method: req.method,
-        path: req.path,
-        statusCode: res.statusCode,
-        ip: req.ip
-      });
+      if (!isHealthCheck) {
+        this.logPerformanceMetric('responseTime', responseTime, {
+          requestId,
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode,
+          ip: req.ip
+        });
+      }
       
       // Track errors
-      if (res.statusCode >= 400) {
+      if (!isHealthCheck && res.statusCode >= 400) {
         this.metrics.errors++;
         this.logSecurityEvent('HTTP_ERROR', {
           statusCode: res.statusCode,
@@ -159,7 +162,9 @@ class SecurityMonitoringSystem {
       }
       
       // Check for suspicious patterns
-      this.analyzeRequestPatterns(req, res, responseTime);
+      if (!isHealthCheck) {
+        this.analyzeRequestPatterns(req, res, responseTime);
+      }
     });
     
     next();
