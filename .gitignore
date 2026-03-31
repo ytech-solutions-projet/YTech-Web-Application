@@ -404,6 +404,7 @@ Thumbs.db
 .env
 .env.*
 !.dockerignore
+!.env.docker.example
 !backend/.env.production.example
 !frontend/.env.production.example
 !backend/package-lock.json

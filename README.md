@@ -117,6 +117,27 @@ cd frontend
 npm run dev -- --port 3001
 ```
 
+### Docker
+
+This repository now includes a local Docker Compose stack for the app and PostgreSQL.
+
+```bash
+cp .env.docker.example .env
+docker compose up --build
+```
+
+Then open:
+
+- `http://localhost:5001`
+
+The Docker setup uses:
+
+- one `app` container built from the root [`Dockerfile`](./Dockerfile)
+- one `db` container based on PostgreSQL 16
+- automatic database bootstrapping through the existing backend startup flow
+
+If you need different local ports, admin credentials or secrets, edit the copied `.env` file before running Compose.
+
 ## Production Environment Essentials
 
 ### Backend
